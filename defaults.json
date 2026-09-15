@@ -1,0 +1,31 @@
+{
+  "preferred_provider": "openrouter",
+  "preferred_models": [
+    "x-ai/grok-latest",
+    "google/gemini-3.8-flash",
+    "deepseek/deepseek-v4.1-flash",
+    "deepseek/deepseek-v4-pro",
+    "meta/muse-spark-1.3"
+  ],
+  "model_aliases": { "x-ai/grok-latest": "~x-ai/grok-latest" },
+  "allow_model_exceptions": false,
+  "default_effort": "xhigh",
+  "complex_effort": "max",
+  "effort_policy": "best_supported",
+  "max_agents": 3,
+  "max_parallel": 2,
+  "max_turns": 12,
+  "max_tool_calls": 60,
+  "timeout_seconds": 600,
+  "submit_grace_seconds": 120,
+  "per_agent_budget_usd": 2,
+  "session_budget_usd": 5,
+  "max_output_tokens": 32768,
+  "max_file_bytes": 524288,
+  "max_context_bytes": 8388608,
+  "openrouter_routing": {
+    "require_parameters": true,
+    "data_collection": "deny",
+    "allow_fallbacks": false
+  }
+}

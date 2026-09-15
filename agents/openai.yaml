@@ -1,0 +1,6 @@
+interface:
+  display_name: "pi"
+  short_description: "Bounded Pi sub-agents; Codex decides what lands"
+  default_prompt: "Use $pi to obtain useful independent model input or candidate edits. Choose the models and minimum permissions, verify the evidence, and report what was useful and what Pi cost."
+policy:
+  allow_implicit_invocation: true

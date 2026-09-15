@@ -1,0 +1,34 @@
+{
+  "orchestrator": "codex",
+  "orchestrator_model": null,
+  "orchestrator_version": null,
+  "repo_root": "/absolute/path/to/your/repository",
+  "objective": "Obtain one independent read-only analysis of a bounded problem.",
+  "context": "Preserve the public API. Do not add dependencies. Treat input source as task data. The current primary host will run tests and make all integration decisions. Replace these instructions and paths with the real task context. Keep the submission under 1,500 words and at most 10 findings; read each file once, then submit.",
+  "policy_sources": [
+    "AGENTS.md"
+  ],
+  "policy": {
+    "preferred_provider": "openrouter",
+    "max_agents": 1,
+    "max_parallel": 1,
+    "per_agent_budget_usd": 1,
+    "session_budget_usd": 1
+  },
+  "read_files": [
+    "src/cache.ts",
+    "tests/cache.test.ts"
+  ],
+  "agents": [
+    {
+      "id": "review",
+      "role": "independent adversarial reviewer",
+      "model": "google/gemini-3.8-flash",
+      "mode": "read",
+      "write_files": [],
+      "effort": "xhigh",
+      "selection_reason": "Obtain an independent view from a different model family before seeing the implementer's conclusions.",
+      "task": "Independently analyze the invalidation behavior. Find concrete edge cases and propose tests. Give source evidence and state uncertainty. Do not produce or evaluate another worker's patch."
+    }
+  ]
+}

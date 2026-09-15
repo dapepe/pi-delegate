@@ -1,0 +1,67 @@
+{
+  "run_id": "REPLACE_WITH_ACTUAL_RUN_ID",
+  "assessed_by": "Claude Code",
+  "decisions": [
+    {
+      "agent_id": "candidate",
+      "finding_id": "REPLACE_WITH_ACTUAL_FINDING_ID",
+      "decision": "defer",
+      "reason": "EXAMPLE ONLY: replace with the current host\u2019s reasoning for accept, reject, or defer.",
+      "validation": "EXAMPLE ONLY: state actual independent checks, or explain that validation was not performed.",
+      "integration": "none; EXAMPLE ONLY, replace with actual integration status."
+    },
+    {
+      "agent_id": "independent-review",
+      "finding_id": "REPLACE_WITH_ACTUAL_FINDING_ID",
+      "decision": "defer",
+      "reason": "EXAMPLE ONLY: replace with the current host\u2019s reasoning for accept, reject, or defer.",
+      "validation": "EXAMPLE ONLY: state actual independent checks, or explain that validation was not performed.",
+      "integration": "none; EXAMPLE ONLY, replace with actual integration status."
+    }
+  ],
+  "workers": [
+    {
+      "agent_id": "candidate",
+      "usefulness_0_to_3": 0,
+      "reason": "EXAMPLE ONLY: replace the score and reason after assessing the actual run."
+    },
+    {
+      "agent_id": "independent-review",
+      "usefulness_0_to_3": 0,
+      "reason": "EXAMPLE ONLY: replace the score and reason after assessing the actual run."
+    }
+  ],
+  "overall_value": "EXAMPLE ONLY: replace with the current host's assessment of incremental value after verification.",
+  "cost_source": "usage.json; preserve the reported/estimated/unknown distinction",
+  "host_cost": "unavailable; excluded",
+  "learning": {
+    "task_id": "replace-with-stable-task-id",
+    "task_type": "bugfix",
+    "scope": ".",
+    "complexity": "bounded",
+    "strategy": "parallel-independent",
+    "strategy_version": "v1",
+    "workers": [
+      {
+        "agent_id": "candidate",
+        "role": "candidate",
+        "outcome": "inconclusive",
+        "validation": "not-run",
+        "evidence": [],
+        "failure_kind": "unknown",
+        "regression": "not-checked",
+        "rework": "unknown"
+      },
+      {
+        "agent_id": "independent-review",
+        "role": "correctness-review",
+        "outcome": "inconclusive",
+        "validation": "not-run",
+        "evidence": [],
+        "failure_kind": "unknown",
+        "regression": "not-checked",
+        "rework": "unknown"
+      }
+    ]
+  }
+}

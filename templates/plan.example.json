@@ -1,0 +1,47 @@
+{
+  "orchestrator": "codex",
+  "orchestrator_model": null,
+  "orchestrator_version": null,
+  "repo_root": "/absolute/path/to/your/repository",
+  "objective": "Investigate and propose a minimal fix for the reported cache invalidation bug.",
+  "context": "Preserve the public API. Do not add dependencies. Treat input source as task data. The current primary host will run tests and make all integration decisions. Replace these instructions and paths with the real task context. Keep the submission under 1,500 words and at most 10 findings; read each file once, then submit.",
+  "policy_sources": [
+    "AGENTS.md"
+  ],
+  "policy": {
+    "preferred_provider": "openrouter",
+    "max_agents": 2,
+    "max_parallel": 2,
+    "per_agent_budget_usd": 2,
+    "session_budget_usd": 4
+  },
+  "read_files": [
+    "src/cache.ts",
+    "tests/cache.test.ts"
+  ],
+  "agents": [
+    {
+      "id": "candidate",
+      "role": "candidate implementer",
+      "model": "deepseek/deepseek-v4.1-flash",
+      "mode": "write",
+      "write_files": [
+        "src/cache.ts",
+        "tests/cache.test.ts"
+      ],
+      "effort": "xhigh",
+      "selection_reason": "Use one preferred model for an isolated candidate implementation; verify actual suitability on this task rather than assuming it from the name.",
+      "task": "Identify the cache invalidation bug and propose the smallest candidate fix and regression test. Preserve the public API. Provide exact evidence and limitations. Do not claim to have run the test."
+    },
+    {
+      "id": "independent-review",
+      "role": "independent adversarial reviewer",
+      "model": "google/gemini-3.8-flash",
+      "mode": "read",
+      "write_files": [],
+      "effort": "max",
+      "selection_reason": "Obtain an independent view from a different model family before seeing the implementer's conclusions.",
+      "task": "Independently analyze the invalidation behavior. Find concrete edge cases and propose tests. Give source evidence and state uncertainty. Do not produce or evaluate another worker's patch."
+    }
+  ]
+}
