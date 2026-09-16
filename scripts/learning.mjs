@@ -3,7 +3,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { pathToFileURL } from 'node:url';
-import { assert, text, cleanRel, sha256, hostLabel, costSummary, isNumber, inside, authorizedIdentities } from './lib.mjs';
+import { assert, text, cleanRel, sha256, hostLabel, costSummary, isNumber, inside, authorizedIdentities, workerPolicy } from './lib.mjs';
+import { runtimeLimits } from './runtime.mjs';
 import { validateAssessment } from './report.mjs';
 import { projectRoot, localPath, readLocal, writeLocal, bytesHash, jsonText, loadJson, ensureState, withLock, plainLines, claudeImportText } from './project-files.mjs';
 export const START = '<!-- pi:learned:start -->', END = '<!-- pi:learned:end -->';
@@ -86,7 +87,7 @@ export function validateLearningAssessment(assessment, report) {
     assert(ROLES.includes(w.role), 'Invalid normalized learning role');
     assert(['useful','neutral','harmful','inconclusive'].includes(w.outcome), 'Invalid outcome');
     assert(['passed','failed','not-run'].includes(w.validation), 'Invalid validation');
-    assert(['none','model','provider','packet','host','unknown'].includes(w.failure_kind), 'Invalid failure_kind');
+    assert(['none','model','provider','packet','host','limit','unknown'].includes(w.failure_kind), 'Invalid failure_kind');
     assert(['none-observed','confirmed','not-checked'].includes(w.regression), 'Invalid regression state');
     assert(['none','minor','major','unknown'].includes(w.rework), 'Invalid rework');
     assert(Array.isArray(w.evidence) && w.evidence.length <= 20 && w.evidence.every(e => typeof e === 'string' && e.trim() && e.length <= 2000), 'Evidence must be a bounded, sanitized string array');
@@ -113,7 +114,8 @@ export function buildLearningRun(config, report, assessment, usage, plan, snapsh
     return { role: l.workers.find(w => w.agent_id === a.id).role,
       provider: m.provider || spec.provider || plan.policy.preferred_provider,
       model_identity: m.catalog_alias_target?.slug || m.canonical_slug || m.resolved_model || spec.model,
-      effective_effort: m.effective_pi_effort || 'unknown', mode: a.mode };
+      effective_effort: m.effective_pi_effort || 'unknown', mode: a.mode,
+      runtime_limits: a.limits || runtimeLimits(workerPolicy(plan.policy || {}, spec.limits), m.max_output_tokens) };
   }).sort((a,b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
   const observations = report.agents.map(a => {
     const evaluation = l.workers.find(w => w.agent_id === a.id), score = assessment.workers.find(w => w.agent_id === a.id);
@@ -132,6 +134,9 @@ export function buildLearningRun(config, report, assessment, usage, plan, snapsh
       model_identity: m.catalog_alias_target?.slug || m.canonical_slug || m.resolved_model || spec.model,
       observed_models: modelIds, upstream_providers: [...new Set(requests.map(r => r.upstream_provider).filter(Boolean))].sort(),
       requested_effort: m.requested_effort || spec.effort, effective_effort: m.effective_pi_effort || 'unknown', mode: a.mode,
+      // A short allocation can make a capable model look bad. Trials run under different
+      // allowances are separate profiles, never pooled as the same routing evidence.
+      runtime_limits: a.limits || runtimeLimits(workerPolicy(plan.policy || {}, spec.limits), m.max_output_tokens),
       team, skill_version: report.skill_version || 'legacy', sdk_version: report.sdk_version_target || 'unknown'
     };
     return { profile, profile_id: digest(profile).slice(0, 16), agent_id: a.id, task_id: l.task_id,
@@ -139,6 +144,8 @@ export function buildLearningRun(config, report, assessment, usage, plan, snapsh
       outcome: evaluation.outcome, validation: evaluation.validation, failure_kind: evaluation.failure_kind,
       regression: evaluation.regression, rework: evaluation.rework, evidence_sha256: digest(evaluation.evidence),
       evidence_count: evaluation.evidence.length, identity_mismatch: mismatch,
+      stop_diagnostic: a.stop_diagnostic || null, failure_class: a.failure_class ?? null,
+      recovery_events: a.recovery_events || [], limit_usage: a.limit_usage || null,
       elapsed_seconds: isNumber(a.elapsed_seconds) ? a.elapsed_seconds : null, costs: costSummary(requests) };
   });
   return { key, project_id: config.project_id, run_id: report.run_id, created_at: report.created_at, task_id: l.task_id,
@@ -193,7 +200,7 @@ export function aggregateLearning(history, config, now = Date.now()) {
     if (harmfulTasks) reasons.push('contradictory_or_regression_evidence');
     return { profile_id: g.profile_id, profile: g.profile, attempts: observations.length, distinct_tasks: tasks.length, quality_evaluated_tasks: qualityTasks,
       useful_tasks: usefulTasks, harmful_tasks: harmfulTasks, useful_fraction: fraction,
-      operational_failures: observations.filter(o => ['provider','packet','host','unknown'].includes(o.failure_kind)).length,
+      operational_failures: observations.filter(o => ['provider','packet','host','limit','unknown'].includes(o.failure_kind)).length,
       mean_usefulness: observations.reduce((sum,o) => sum + o.usefulness,0) / observations.length,
       median_seconds: seconds.length ? (seconds[Math.floor((seconds.length-1)/2)] + seconds[Math.floor(seconds.length/2)]) / 2 : null,
       costs, latest_at: observations.map(o => o.at).sort().at(-1),
@@ -223,11 +230,15 @@ export function replaceLearnedBlock(value, block) {
 function renderBlock(profiles, config) {
   const lines = [START, '## pi — learned delegation preferences', '',
     'Advisory project evidence, not policy or a global model ranking. Human instructions, current model availability, privacy, budgets, effort policy and permission limits always prevail. The host decides; workers cannot update this section.',
-    'Use only for the matching task, scope, host and recorded model version. Check `.pi/learning` when available. Do not infer a new authorization from memory.'];
+    'Use only for the matching task, scope, host, recorded model version and runtime allocation. Check `.pi/learning` when available. Do not infer a new authorization from memory.'];
   for (const g of profiles) {
     const p = g.profile, expiry = g.revalidate_after.slice(0,10);
     lines.push('', `- ${inline(p.task_type)} / ${inline(p.scope)} / ${inline(p.complexity)}; ${hostLabel(p.host)} (${inline(p.host_model)}): consider ${STRATEGIES[p.strategy]} (${inline(p.strategy_version)}), ${inline(p.role)}, ${inline(p.provider)}/${inline(p.model_identity)}, ${inline(p.mode)} access, effective ${inline(p.effective_effort)}.`,
       `  Evidence ${g.profile_id}: ${g.useful_tasks}/${g.quality_evaluated_tasks} distinct evaluated tasks useful; ${g.attempts} attempts; reported $${g.costs.reported_usd.toFixed(4)}, unresolved estimates $${g.costs.estimated_unreconciled_usd.toFixed(4)}, ${g.costs.unpriced_requests} unpriced requests. Revalidate after ${expiry} or any model/host/strategy change. This supports considering the profile, not skipping validation.`);
+    const allocation = p.runtime_limits || {};
+    const parts = [['max_turns', 'requests'], ['max_tool_calls', 'tools'], ['timeout_seconds', 'worker seconds'], ['max_output_tokens', 'output tokens']]
+      .filter(([key]) => Number.isFinite(allocation[key])).map(([key, unit]) => `${allocation[key]} ${unit}`);
+    if (parts.length) lines.push(`  Recorded allocation: ${parts.join(', ')}. Other limits and team allocations must match the local profile; this is not permission to increase them.`);
     if (p.team?.length > 1) lines.push(`  Team: ${p.team.map(w => `${inline(w.role)}=${inline(w.provider)}/${inline(w.model_identity)} (${inline(w.effective_effort)}, ${inline(w.mode)})`).join('; ')}. Do not assume the same contribution with a different team.`);
   }
   if (!profiles.length) lines.push('', 'No promoted preference currently meets the evidence threshold. Use current authorized defaults; do not invent a model ranking.');

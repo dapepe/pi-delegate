@@ -1,5 +1,6 @@
 /** Render measured facts separately from the host's explicitly supplied judgments. */
 import { assert, text, isNumber, hostLabel } from './lib.mjs';
+import { explainStop } from './runtime.mjs';
 const cell = value => String(value ?? 'unknown').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('|', '\\|').replace(/[\r\n]+/g, ' ').replace(/[\x00-\x1f\x7f]/g, '');
 const money = n => isNumber(n) ? `$${n.toFixed(6)}` : 'unknown';
 export function validateAssessment(input, report) {
@@ -76,6 +77,15 @@ export function markdownReport(report, assessment = null) {
   lines.push('', '## Findings and decisions', '');
   for (const a of report.agents) {
     lines.push(`### ${cell(a.id)}`, '', cell(a.submission?.summary || 'No completed structured submission.'), '');
+    if (a.status !== 'completed') {
+      const diagnostic = a.stop_diagnostic || explainStop(a.status);
+      lines.push(`**Incomplete: ${cell(a.status)} (${cell(diagnostic.layer)}).** ${cell(diagnostic.advice)}`, '');
+    }
+    if (a.limit_usage && a.limits) lines.push(`Allowance used: ${cell(a.limit_usage.requests)}/${cell(a.limits.max_turns)} provider requests; ${cell(a.limit_usage.tool_calls)}/${cell(a.limits.max_tool_calls)} tool calls; ${cell(a.limit_usage.elapsed_seconds)}/${cell(a.limits.timeout_seconds)} worker seconds. Completion repairs: ${cell(a.limit_usage.completion_repairs)}.`, '');
+    if (a.finalization) lines.push(`Finalization trigger: ${cell(a.finalization.trigger)}. Reserved inside existing limits, not extra permission or budget.`, '');
+    if (a.submission?.completion && a.submission.completion !== 'complete') lines.push(`Worker completion claim: ${cell(a.submission.completion)}. This is the worker's claim, not a validated outcome.`, '');
+    if (a.submission?.remaining_work?.length) lines.push(`Remaining work (worker claim): ${a.submission.remaining_work.map(cell).join('; ')}`, '');
+    if (!a.submission && a.partial_output?.text) lines.push(`Unvalidated public output${a.partial_output.truncated ? ' (truncated)' : ''}: ${cell(a.partial_output.text)}`, '');
     for (const f of a.submission?.findings || []) {
       const d = assessment?.decisions.find(d => d.agent_id === a.id && d.finding_id === f.id);
       lines.push(`**${cell(f.id)} — ${cell(f.title)}** (${cell(f.severity)}, worker confidence ${cell(f.confidence)})`, '',
@@ -86,7 +96,7 @@ export function markdownReport(report, assessment = null) {
     if (a.coverage) lines.push(`Coverage log: ${a.coverage.reads.length} explicit read(s), ${a.coverage.searches.length} search(es). This measures retrieval, not comprehension.`, '');
     if (a.warnings?.length) lines.push(`Warnings: ${a.warnings.map(cell).join('; ')}`, '');
     if (a.failure_class && a.failure_class !== 'none') lines.push(`Failure class: ${cell(a.failure_class)} (suggested learning failure_kind: ${cell(a.suggested_learning_failure_kind)}). ${cell(a.failure_hint)}`, '');
-    if (a.timing && isNumber(a.timing.mean_request_seconds)) lines.push(`Timing: ${a.timing.requests} request(s), mean ${a.timing.mean_request_seconds} s, max ${a.timing.max_request_seconds} s${a.deadline ? `; deadline warnings ${a.deadline.warnings}, refused tool calls in the grace window ${a.deadline.refusals}` : ''}.`, '');
+    if (a.timing && isNumber(a.timing.mean_request_seconds)) lines.push(`Timing: ${a.timing.requests} request(s), mean ${a.timing.mean_request_seconds} s, max ${a.timing.max_request_seconds} s${a.deadline ? `; deadline warnings ${a.deadline.warnings}, tool calls refused in the finishing window ${a.deadline.refusals}` : ''}.`, '');
   }
   lines.push('## Overall value', '', assessment ? cell(assessment.overall_value) : `Awaiting ${host} assessment. Workers cannot grade themselves.`, '',
     `Workers cannot execute tests. Any tests mentioned in their submissions are proposals. Validation and integration statements above, when present, are supplied by ${host}, not automatically proven by this report renderer.`, '',

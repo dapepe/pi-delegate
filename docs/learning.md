@@ -58,7 +58,7 @@ After reviewing each worker and independently validating its claims, the host wr
 
 Use the **same `task_id` for retries and phases of the same real task**. A new filename, run ID, worker, host, or session is not a new task. `task_type`, `scope`, and `complexity` describe the actual work. `strategy_version` identifies the host's task-packet/process recipe; increment it when that recipe materially changes, not after every result.
 
-The recorded profile separates host and known host-model/version, task class/scope/complexity, strategy/version, normalized role, complete same-plan worker team, requested/resolved/observed model identity, upstream provider, requested/effective effort, read versus candidate-write permission, and skill/SDK versions. A changed ensemble or resolved moving-alias target is not pooled with the old configuration. Unknown host identity is recorded as unknown, never invented; assess unknown-version history conservatively and reset the strategy version when the effective host changes.
+The recorded profile separates host and known host-model/version, task class/scope/complexity, strategy/version, normalized role, complete same-plan worker team, requested/resolved/observed model identity, upstream provider, requested/effective effort, read versus candidate-write permission, runtime allocations (including companion-worker allocations and the effective output allowance), and skill/SDK versions. A changed ensemble or resolved moving-alias target is not pooled with the old configuration. Unknown host identity is recorded as unknown, never invented; assess unknown-version history conservatively and reset the strategy version when the effective host changes.
 
 Supported strategy labels:
 
@@ -75,7 +75,7 @@ Normalized roles are `scout`, `candidate`, `correctness-review`, `test-review`, 
 
 A useful observation requires a completed worker, captured request/resolved model-effort metadata, host usefulness score at least 2/3, independently passed validation with evidence references, no policy violation/identity mismatch, no observed regression, and no major or unknown rework. A clean review may score 1 for useful assurance without becoming a routing win. Proposed tests alone do not establish passed validation. Negative quality claims also require host evidence.
 
-Use `failure_kind` to distinguish model-quality failures from provider outages, inadequate packets, host mistakes or unknown causes. Operational failures stay visible with their costs; they are not silently counted as incorrect model answers. They should still influence the host's practical reliability judgment. Confirmed regressions veto a positive preference.
+Use `failure_kind` to distinguish model-quality failures from provider outages, inadequate packets, host mistakes or unknown causes. `failure_kind: "limit"` records an established time, request, tool, context or budget-admission failure as operational, not as a negative reasoning verdict. The stop diagnostic, actual allowance usage and completion-repair metadata are retained in the observation. Do not infer a cause from an unfinished artifact alone, and do not promote an incomplete assignment as a completed success even when some partial findings were useful. Operational failures stay visible with their costs; they are not silently counted as incorrect model answers. They should still influence the host's practical reliability judgment. Confirmed regressions veto a positive preference.
 
 ## Default promotion floor
 

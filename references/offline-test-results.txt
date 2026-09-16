@@ -1,632 +1,854 @@
 
-> pi@1.2.0 test
+> pi@1.4.0 test
 > node scripts/test.mjs
 
 TAP version 13
 # Subtest: containment handles filesystem roots and sibling prefix tricks
 ok 1 - containment handles filesystem roots and sibling prefix tricks
   ---
-  duration_ms: 0.935584
+  duration_ms: 0.593834
   type: 'test'
   ...
 # Subtest: portable paths reject devices, trailing dots, and Windows wildcard names
 ok 2 - portable paths reject devices, trailing dots, and Windows wildcard names
   ---
-  duration_ms: 0.492689
+  duration_ms: 0.310417
   type: 'test'
   ...
 # Subtest: nested policy objects cannot be arrays or null and route price limits are validated
 ok 3 - nested policy objects cannot be arrays or null and route price limits are validated
   ---
-  duration_ms: 0.429595
+  duration_ms: 0.283
   type: 'test'
   ...
 # Subtest: provider exceptions need an explicit policy grant and a nonempty reason
 ok 4 - provider exceptions need an explicit policy grant and a nonempty reason
   ---
-  duration_ms: 2.143996
+  duration_ms: 2.396
   type: 'test'
   ...
 # Subtest: plans reject case, Unicode, and file/directory path grant collisions
 ok 5 - plans reject case, Unicode, and file/directory path grant collisions
   ---
-  duration_ms: 1.096195
+  duration_ms: 2.0085
   type: 'test'
   ...
 # Subtest: plan field types, bounded lists, and output worker names fail closed
 ok 6 - plan field types, bounded lists, and output worker names fail closed
   ---
-  duration_ms: 0.814672
+  duration_ms: 2.053584
   type: 'test'
   ...
 # Subtest: uncreated candidate paths cannot be cited as evidence
 ok 7 - uncreated candidate paths cannot be cited as evidence
   ---
-  duration_ms: 0.271638
+  duration_ms: 0.686917
   type: 'test'
   ...
 # Subtest: source read/search coverage is recorded without claiming comprehension
 ok 8 - source read/search coverage is recorded without claiming comprehension
   ---
-  duration_ms: 3.231569
+  duration_ms: 3.058958
   type: 'test'
   ...
 # Subtest: reservations cover unpriced/in-flight requests but are never reported as billing
 ok 9 - reservations cover unpriced/in-flight requests but are never reported as billing
   ---
-  duration_ms: 0.436445
+  duration_ms: 0.617166
   type: 'test'
   ...
 # Subtest: synthetic error after a completed response does not erase its usage or charge
 ok 10 - synthetic error after a completed response does not erase its usage or charge
   ---
-  duration_ms: 9.920786
+  duration_ms: 17.759542
   type: 'test'
   ...
 # Subtest: zero-filled successful usage remains unknown when billing lookup fails
 ok 11 - zero-filled successful usage remains unknown when billing lookup fails
   ---
-  duration_ms: 4.073331
+  duration_ms: 13.162875
   type: 'test'
   ...
 # Subtest: an interrupted stream retains generation identity and reconciles its charge
 ok 12 - an interrupted stream retains generation identity and reconciles its charge
   ---
-  duration_ms: 3.548184
+  duration_ms: 8.405083
   type: 'test'
   ...
 # Subtest: known canonical model identities are accepted and unrelated identities stop tool use
 ok 13 - known canonical model identities are accepted and unrelated identities stop tool use
   ---
-  duration_ms: 8.170119
+  duration_ms: 17.924709
   type: 'test'
   ...
 # Subtest: concurrent workers cannot each reserve the same remaining soft budget
 ok 14 - concurrent workers cannot each reserve the same remaining soft budget
   ---
-  duration_ms: 20.626478
+  duration_ms: 26.10025
   type: 'test'
   ...
 # Subtest: progress and persisted reports do not include credentials or full transcripts
 ok 15 - progress and persisted reports do not include credentials or full transcripts
   ---
-  duration_ms: 5.020182
+  duration_ms: 8.48075
   type: 'test'
   ...
 # Subtest: startup failure preserves unstarted authorized workers in the report
 ok 16 - startup failure preserves unstarted authorized workers in the report
   ---
-  duration_ms: 2.43918
+  duration_ms: 5.090375
   type: 'test'
   ...
 # Subtest: instruction and learning paths are never delegable, even for candidate writes
 ok 17 - instruction and learning paths are never delegable, even for candidate writes
   ---
-  duration_ms: 1.083736
+  duration_ms: 1.405542
   type: 'test'
   ...
 # Subtest: Claude Code is propagated through worker prompt, results, and host-only authority
 ok 18 - Claude Code is propagated through worker prompt, results, and host-only authority
   ---
-  duration_ms: 5.475546
+  duration_ms: 9.104709
   type: 'test'
   ...
 # Subtest: plans validate explicit host identity and reject unknown host metadata
 ok 19 - plans validate explicit host identity and reject unknown host metadata
   ---
-  duration_ms: 0.590536
+  duration_ms: 0.931542
   type: 'test'
   ...
 # Subtest: learning initialization is opt-in and leaves project instructions alone by default
 ok 20 - learning initialization is opt-in and leaves project instructions alone by default
   ---
-  duration_ms: 5.224559
+  duration_ms: 5.495417
   type: 'test'
   ...
 # Subtest: uninitialized summary is read-only and does not create memory
 ok 21 - uninitialized summary is read-only and does not create memory
   ---
-  duration_ms: 0.834171
+  duration_ms: 1.234458
   type: 'test'
   ...
 # Subtest: Claude import is explicit, idempotent and preserves existing instructions
 ok 22 - Claude import is explicit, idempotent and preserves existing instructions
   ---
-  duration_ms: 4.946943
+  duration_ms: 10.197083
   type: 'test'
   ...
 # Subtest: a fenced import example does not count as an active import
 ok 23 - a fenced import example does not count as an active import
   ---
-  duration_ms: 0.129535
+  duration_ms: 0.090542
   type: 'test'
   ...
 # Subtest: initializing a missing shared AGENTS.md creates it only for the explicit Claude bridge
 ok 24 - initializing a missing shared AGENTS.md creates it only for the explicit Claude bridge
   ---
-  duration_ms: 1.476876
+  duration_ms: 4.727625
   type: 'test'
   ...
 # Subtest: existing learning mode cannot be silently overwritten by init
 ok 25 - existing learning mode cannot be silently overwritten by init
   ---
-  duration_ms: 2.788995
+  duration_ms: 7.295833
   type: 'test'
   ...
 # Subtest: record is idempotent and never edits AGENTS.md
 ok 26 - record is idempotent and never edits AGENTS.md
   ---
-  duration_ms: 19.763614
+  duration_ms: 13.670625
   type: 'test'
   ...
 # Subtest: propose mode never writes AGENTS.md and needs explicit approval to apply
 ok 27 - propose mode never writes AGENTS.md and needs explicit approval to apply
   ---
-  duration_ms: 19.796453
+  duration_ms: 21.634917
   type: 'test'
   ...
 # Subtest: auto mode still requires a fresh explicit host-reviewed apply operation
 ok 28 - auto mode still requires a fresh explicit host-reviewed apply operation
   ---
-  duration_ms: 24.236936
+  duration_ms: 17.668125
   type: 'test'
   ...
 # Subtest: worker names cannot authorize memory promotion
 ok 29 - worker names cannot authorize memory promotion
   ---
-  duration_ms: 3.751939
+  duration_ms: 6.917125
   type: 'test'
   ...
 # Subtest: fewer than three distinct useful tasks cannot become a model preference
 ok 30 - fewer than three distinct useful tasks cannot become a model preference
   ---
-  duration_ms: 6.220603
+  duration_ms: 8.77025
   type: 'test'
   ...
 # Subtest: retries on the same task do not inflate success sample size but all costs count
 ok 31 - retries on the same task do not inflate success sample size but all costs count
   ---
-  duration_ms: 36.599404
+  duration_ms: 16.505167
   type: 'test'
   ...
 # Subtest: host and host-model changes keep observational profiles separate
 ok 32 - host and host-model changes keep observational profiles separate
   ---
-  duration_ms: 24.871097
+  duration_ms: 18.488
   type: 'test'
   ...
 # Subtest: model-version changes are not pooled under a moving alias
 ok 33 - model-version changes are not pooled under a moving alias
   ---
-  duration_ms: 13.4593
+  duration_ms: 9.391167
   type: 'test'
   ...
 # Subtest: task class, scope, strategy version, role, effort, access and upstream stay separate
 ok 34 - task class, scope, strategy version, role, effort, access and upstream stay separate
   ---
-  duration_ms: 35.338036
+  duration_ms: 27.776125
   type: 'test'
   ...
 # Subtest: operational failures do not count as model-quality failures
 ok 35 - operational failures do not count as model-quality failures
   ---
-  duration_ms: 18.577274
+  duration_ms: 14.256083
   type: 'test'
   ...
 # Subtest: validated harmful outcome blocks promotion despite previous useful outcomes
 ok 36 - validated harmful outcome blocks promotion despite previous useful outcomes
   ---
-  duration_ms: 26.638739
+  duration_ms: 14.756708
   type: 'test'
   ...
 # Subtest: late regression revisions preserve audit history and demote prior preferences
 ok 37 - late regression revisions preserve audit history and demote prior preferences
   ---
-  duration_ms: 39.412275
+  duration_ms: 22.432
   type: 'test'
   ...
 # Subtest: revisions cannot change the task id to manufacture an independent observation
 ok 38 - revisions cannot change the task id to manufacture an independent observation
   ---
-  duration_ms: 7.127324
+  duration_ms: 6.314417
   type: 'test'
   ...
 # Subtest: stale observations expire instead of becoming permanent model rankings
 ok 39 - stale observations expire instead of becoming permanent model rankings
   ---
-  duration_ms: 16.003532
+  duration_ms: 10.993916
   type: 'test'
   ...
 # Subtest: unknown and estimated costs are distinct and revise does not double-count late billing
 ok 40 - unknown and estimated costs are distinct and revise does not double-count late billing
   ---
-  duration_ms: 10.125261
+  duration_ms: 8.704583
   type: 'test'
   ...
 # Subtest: unverified praise and self-ratings cannot create positive learning evidence
 ok 41 - unverified praise and self-ratings cannot create positive learning evidence
   ---
-  duration_ms: 28.527188
+  duration_ms: 14.670584
   type: 'test'
   ...
 # Subtest: offline test doubles cannot accidentally enter live project memory
 ok 42 - offline test doubles cannot accidentally enter live project memory
   ---
-  duration_ms: 4.364364
+  duration_ms: 4.657708
   type: 'test'
   ...
 # Subtest: another project or host cannot be used as evidence for this project run
 ok 43 - another project or host cannot be used as evidence for this project run
   ---
-  duration_ms: 8.119132
+  duration_ms: 5.20975
   type: 'test'
   ...
 # Subtest: late model identity mismatch cannot support a positive preference
 ok 44 - late model identity mismatch cannot support a positive preference
   ---
-  duration_ms: 5.168961
+  duration_ms: 4.527292
   type: 'test'
   ...
 # Subtest: apply refuses a changed AGENTS.md and preserves the concurrent user edit
 ok 45 - apply refuses a changed AGENTS.md and preserves the concurrent user edit
   ---
-  duration_ms: 27.948203
+  duration_ms: 12.966667
   type: 'test'
   ...
 # Subtest: apply refuses stale history or an altered proposal block
 ok 46 - apply refuses stale history or an altered proposal block
   ---
-  duration_ms: 37.607006
+  duration_ms: 22.090959
   type: 'test'
   ...
 # Subtest: repeated proposal/apply on unchanged evidence leaves AGENTS.md byte-identical
 ok 47 - repeated proposal/apply on unchanged evidence leaves AGENTS.md byte-identical
   ---
-  duration_ms: 37.088579
+  duration_ms: 21.277542
   type: 'test'
   ...
 # Subtest: off mode prevents recording and promotion without deleting shared instructions
 ok 48 - off mode prevents recording and promotion without deleting shared instructions
   ---
-  duration_ms: 10.795117
+  duration_ms: 6.344167
   type: 'test'
   ...
 # Subtest: only a well-formed marked section is replaceable; examples are never edit boundaries
 ok 49 - only a well-formed marked section is replaceable; examples are never edit boundaries
   ---
-  duration_ms: 0.414943
+  duration_ms: 0.203666
   type: 'test'
   ...
 # Subtest: local safe writes preserve BOM/line endings and reject stale hashes
 ok 50 - local safe writes preserve BOM/line endings and reject stale hashes
   ---
-  duration_ms: 2.721633
+  duration_ms: 3.368417
   type: 'test'
   ...
 # Subtest: learning locks fail closed rather than racing concurrent promotions
 ok 51 - learning locks fail closed rather than racing concurrent promotions
   ---
-  duration_ms: 0.984678
+  duration_ms: 2.408584
   type: 'test'
   ...
 # Subtest: learning config cannot lower evidence floors or expand the summary limit
 ok 52 - learning config cannot lower evidence floors or expand the summary limit
   ---
-  duration_ms: 1.027492
+  duration_ms: 2.558334
   type: 'test'
   ...
 # Subtest: reflection text and scripts are not an accepted strategy configuration
 ok 53 - reflection text and scripts are not an accepted strategy configuration
   ---
-  duration_ms: 1.105569
+  duration_ms: 3.308458
   type: 'test'
   ...
 # Subtest: explicit profile removal generates a safe empty advisory block
 ok 54 - explicit profile removal generates a safe empty advisory block
   ---
-  duration_ms: 22.351166
+  duration_ms: 12.745167
   type: 'test'
   ...
 # Subtest: oversized AGENTS.md is not silently expanded beyond Codex default context budget
 ok 55 - oversized AGENTS.md is not silently expanded beyond Codex default context budget
   ---
-  duration_ms: 1.594392
+  duration_ms: 2.76775
   type: 'test'
   ...
 # Subtest: instruction-file symlinks and hardlinks cannot redirect learning writes
 ok 56 - instruction-file symlinks and hardlinks cannot redirect learning writes
   ---
-  duration_ms: 4.508234
+  duration_ms: 3.680334
   type: 'test'
   ...
 # Subtest: newer failures cannot extend the refresh date of older supporting observations
 ok 57 - newer failures cannot extend the refresh date of older supporting observations
   ---
-  duration_ms: 23.621623
+  duration_ms: 12.952875
   type: 'test'
   ...
 # Subtest: useful evidence requires captured requests and resolved configuration
 ok 58 - useful evidence requires captured requests and resolved configuration
   ---
-  duration_ms: 11.209929
+  duration_ms: 8.619541
   type: 'test'
   ...
 # Subtest: a changed companion model does not pool an ensemble contribution
 ok 59 - a changed companion model does not pool an ensemble contribution
   ---
-  duration_ms: 11.440186
+  duration_ms: 7.713
   type: 'test'
   ...
 # Subtest: the public learn CLI supports local Claude setup and rejects unused flags without inference
 ok 60 - the public learn CLI supports local Claude setup and rejects unused flags without inference
   ---
-  duration_ms: 128.134756
+  duration_ms: 113.631084
+  type: 'test'
+  ...
+# Subtest: limit failures stay operational rather than negative model-quality evidence
+ok 61 - limit failures stay operational rather than negative model-quality evidence
+  ---
+  duration_ms: 12.520542
+  type: 'test'
+  ...
+# Subtest: different runtime allocations cannot be pooled as the same model strategy
+ok 62 - different runtime allocations cannot be pooled as the same model strategy
+  ---
+  duration_ms: 7.912
+  type: 'test'
+  ...
+# Subtest: promoted guidance shows the recorded allocation without granting a larger one
+ok 63 - promoted guidance shows the recorded allocation without granting a larger one
+  ---
+  duration_ms: 12.558916
+  type: 'test'
+  ...
+# Subtest: a partial worker result keeps its stop diagnostic in the observation
+ok 64 - a partial worker result keeps its stop diagnostic in the observation
+  ---
+  duration_ms: 4.716084
   type: 'test'
   ...
 # Subtest: paths reject traversal, absolute paths, control characters and Windows escapes
-ok 61 - paths reject traversal, absolute paths, control characters and Windows escapes
+ok 65 - paths reject traversal, absolute paths, control characters and Windows escapes
   ---
-  duration_ms: 1.254822
+  duration_ms: 0.935041
   type: 'test'
   ...
 # Subtest: sensitive and runtime configuration paths are denied
-ok 62 - sensitive and runtime configuration paths are denied
+ok 66 - sensitive and runtime configuration paths are denied
   ---
-  duration_ms: 0.258759
+  duration_ms: 0.540833
   type: 'test'
   ...
 # Subtest: effort is exact when supported
-ok 63 - effort is exact when supported
+ok 67 - effort is exact when supported
   ---
-  duration_ms: 0.710697
+  duration_ms: 0.764708
   type: 'test'
   ...
 # Subtest: xhigh maps upward to max rather than silently down to high
-ok 64 - xhigh maps upward to max rather than silently down to high
+ok 68 - xhigh maps upward to max rather than silently down to high
   ---
-  duration_ms: 0.159079
+  duration_ms: 0.124167
   type: 'test'
   ...
 # Subtest: max maps to highest supported and strict mapping rejects it
-ok 65 - max maps to highest supported and strict mapping rejects it
+ok 69 - max maps to highest supported and strict mapping rejects it
   ---
-  duration_ms: 0.194642
+  duration_ms: 0.306916
   type: 'test'
   ...
 # Subtest: unknown configuration keys and incompatible defaults fail closed
-ok 66 - unknown configuration keys and incompatible defaults fail closed
+ok 70 - unknown configuration keys and incompatible defaults fail closed
   ---
-  duration_ms: 0.355434
+  duration_ms: 0.508084
   type: 'test'
   ...
 # Subtest: model resolution is exact or explicitly aliased, never fuzzy
-ok 67 - model resolution is exact or explicitly aliased, never fuzzy
+ok 71 - model resolution is exact or explicitly aliased, never fuzzy
   ---
-  duration_ms: 0.366781
+  duration_ms: 0.351084
   type: 'test'
   ...
 # Subtest: OpenRouter model maps every unsupported effort explicitly to null
-ok 68 - OpenRouter model maps every unsupported effort explicitly to null
+ok 72 - OpenRouter model maps every unsupported effort explicitly to null
   ---
-  duration_ms: 0.305749
+  duration_ms: 0.259917
   type: 'test'
   ...
 # Subtest: rate estimates use maximum published overrides, not a stale bargain rate
-ok 69 - rate estimates use maximum published overrides, not a stale bargain rate
+ok 73 - rate estimates use maximum published overrides, not a stale bargain rate
   ---
-  duration_ms: 0.314251
+  duration_ms: 0.308625
   type: 'test'
   ...
 # Subtest: snapshot preserves current uncommitted bytes and detects subsequent staleness
-ok 70 - snapshot preserves current uncommitted bytes and detects subsequent staleness
+ok 74 - snapshot preserves current uncommitted bytes and detects subsequent staleness
   ---
-  duration_ms: 2.964759
+  duration_ms: 4.90025
   type: 'test'
   ...
 # Subtest: symlink sources and missing/binary/oversized sources are rejected
-ok 71 - symlink sources and missing/binary/oversized sources are rejected
+ok 75 - symlink sources and missing/binary/oversized sources are rejected
   ---
-  duration_ms: 1.56592
+  duration_ms: 1.911208
   type: 'test'
   ...
 # Subtest: a read-only worker has no write, shell, subprocess or network tool
-ok 72 - a read-only worker has no write, shell, subprocess or network tool
+ok 76 - a read-only worker has no write, shell, subprocess or network tool
   ---
-  duration_ms: 1.427802
+  duration_ms: 2.251583
   type: 'test'
   ...
 # Subtest: write permission requires an explicit list; read-only cannot smuggle write_files
-ok 73 - write permission requires an explicit list; read-only cannot smuggle write_files
+ok 77 - write permission requires an explicit list; read-only cannot smuggle write_files
   ---
-  duration_ms: 2.256496
+  duration_ms: 2.016
   type: 'test'
   ...
 # Subtest: candidate edits stay in memory and do not alter another worker or the repository
-ok 74 - candidate edits stay in memory and do not alter another worker or the repository
+ok 78 - candidate edits stay in memory and do not alter another worker or the repository
   ---
-  duration_ms: 1.418318
+  duration_ms: 2.068209
   type: 'test'
   ...
 # Subtest: existing write targets must be included in the worker read set
-ok 75 - existing write targets must be included in the worker read set
+ok 79 - existing write targets must be included in the worker read set
   ---
-  duration_ms: 1.120301
+  duration_ms: 1.700667
   type: 'test'
   ...
 # Subtest: new candidate files are absent in baseline; concurrent creation invalidates snapshot
-ok 76 - new candidate files are absent in baseline; concurrent creation invalidates snapshot
+ok 80 - new candidate files are absent in baseline; concurrent creation invalidates snapshot
   ---
-  duration_ms: 1.049925
+  duration_ms: 1.977375
   type: 'test'
   ...
 # Subtest: submission validates evidence and terminates further tool use
-ok 77 - submission validates evidence and terminates further tool use
+ok 81 - submission validates evidence and terminates further tool use
   ---
-  duration_ms: 1.005488
+  duration_ms: 1.723333
   type: 'test'
   ...
 # Subtest: a billed request is not double-counted with its estimate; missing cost is unknown
-ok 78 - a billed request is not double-counted with its estimate; missing cost is unknown
+ok 82 - a billed request is not double-counted with its estimate; missing cost is unknown
   ---
-  duration_ms: 0.200621
+  duration_ms: 0.114125
   type: 'test'
   ...
 # Subtest: reconciliation uses generation total_cost and is idempotent
-ok 79 - reconciliation uses generation total_cost and is idempotent
+ok 83 - reconciliation uses generation total_cost and is idempotent
   ---
-  duration_ms: 0.463706
+  duration_ms: 0.723416
   type: 'test'
   ...
 # Subtest: failed billing lookup does not invent a zero charge or log the key
-ok 80 - failed billing lookup does not invent a zero charge or log the key
+ok 84 - failed billing lookup does not invent a zero charge or log the key
   ---
-  duration_ms: 0.243716
+  duration_ms: 0.175917
   type: 'test'
   ...
 # Subtest: offline runner integration preserves source, writes candidate artifacts and bills each request once
-ok 81 - offline runner integration preserves source, writes candidate artifacts and bills each request once
+ok 85 - offline runner integration preserves source, writes candidate artifacts and bills each request once
   ---
-  duration_ms: 6.869136
+  duration_ms: 16.083625
   type: 'test'
   ...
 # Subtest: findings keep original evidence lines after candidate deletion
-ok 82 - findings keep original evidence lines after candidate deletion
+ok 86 - findings keep original evidence lines after candidate deletion
   ---
-  duration_ms: 0.928453
+  duration_ms: 1.99175
   type: 'test'
   ...
 # Subtest: unassessed reports never invent usefulness, free requests, or completed tests
-ok 83 - unassessed reports never invent usefulness, free requests, or completed tests
+ok 87 - unassessed reports never invent usefulness, free requests, or completed tests
   ---
-  duration_ms: 1.162654
+  duration_ms: 0.936625
   type: 'test'
   ...
 # Subtest: only a complete run-specific Codex assessment is accepted
-ok 84 - only a complete run-specific Codex assessment is accepted
+ok 88 - only a complete run-specific Codex assessment is accepted
   ---
-  duration_ms: 1.06662
+  duration_ms: 1.10975
   type: 'test'
   ...
 # Subtest: assessment requires valid score, independent validation and actual finding references
-ok 85 - assessment requires valid score, independent validation and actual finding references
+ok 89 - assessment requires valid score, independent validation and actual finding references
   ---
-  duration_ms: 0.295994
+  duration_ms: 0.139417
   type: 'test'
   ...
 # Subtest: failed workers also need explicit value judgments
-ok 86 - failed workers also need explicit value judgments
+ok 90 - failed workers also need explicit value judgments
   ---
-  duration_ms: 0.267061
+  duration_ms: 0.166875
   type: 'test'
   ...
 # Subtest: rendering does not mutate raw facts or silently mark candidates integrated
-ok 87 - rendering does not mutate raw facts or silently mark candidates integrated
+ok 91 - rendering does not mutate raw facts or silently mark candidates integrated
   ---
-  duration_ms: 0.449044
+  duration_ms: 0.44225
   type: 'test'
   ...
 # Subtest: Claude Code assessments match the recorded host and retain host-specific cost exclusion
-ok 88 - Claude Code assessments match the recorded host and retain host-specific cost exclusion
+ok 92 - Claude Code assessments match the recorded host and retain host-specific cost exclusion
   ---
-  duration_ms: 1.087942
+  duration_ms: 0.269625
+  type: 'test'
+  ...
+# Subtest: every stop status has both a layer and a retry classification
+ok 93 - every stop status has both a layer and a retry classification
+  ---
+  duration_ms: 1.266958
+  type: 'test'
+  ...
+# Subtest: the finishing allowance is reserved inside the authorized limit, never above it
+ok 94 - the finishing allowance is reserved inside the authorized limit, never above it
+  ---
+  duration_ms: 0.125875
+  type: 'test'
+  ...
+# Subtest: runtime policy rejects overflow, unbounded repair and a reserve that leaves no work
+ok 95 - runtime policy rejects overflow, unbounded repair and a reserve that leaves no work
+  ---
+  duration_ms: 0.324333
+  type: 'test'
+  ...
+# Subtest: worker allocations may reduce but cannot raise authorized ceilings
+ok 96 - worker allocations may reduce but cannot raise authorized ceilings
+  ---
+  duration_ms: 0.174834
+  type: 'test'
+  ...
+# Subtest: partial and blocked submissions require unfinished work; a complete claim cannot list it
+ok 97 - partial and blocked submissions require unfinished work; a complete claim cannot list it
+  ---
+  duration_ms: 0.198167
+  type: 'test'
+  ...
+# Subtest: captured public output excludes reasoning blocks and tool arguments, and marks truncation
+ok 98 - captured public output excludes reasoning blocks and tool arguments, and marks truncation
+  ---
+  duration_ms: 0.403791
+  type: 'test'
+  ...
+# Subtest: near the deadline tool results warn once, and inside the finishing window only submit_result is accepted
+ok 99 - near the deadline tool results warn once, and inside the finishing window only submit_result is accepted
+  ---
+  duration_ms: 6.612042
+  type: 'test'
+  ...
+# Subtest: no deadline source means no warnings or refusals
+ok 100 - no deadline source means no warnings or refusals
+  ---
+  duration_ms: 1.957125
+  type: 'test'
+  ...
+# Subtest: the final tool slot stays reserved for submission even after repeated denied investigation
+ok 101 - the final tool slot stays reserved for submission even after repeated denied investigation
+  ---
+  duration_ms: 2.194708
+  type: 'test'
+  ...
+# Subtest: ordinary exact-replacement mistakes are tool errors, not permission violations
+ok 102 - ordinary exact-replacement mistakes are tool errors, not permission violations
+  ---
+  duration_ms: 1.459208
+  type: 'test'
+  ...
+# Subtest: a premature normal stop receives one bounded continuation without losing task permissions
+ok 103 - a premature normal stop receives one bounded continuation without losing task permissions
+  ---
+  duration_ms: 26.314917
+  type: 'test'
+  ...
+# Subtest: repeated premature stops cannot create an unbounded recovery loop
+ok 104 - repeated premature stops cannot create an unbounded recovery loop
+  ---
+  duration_ms: 15.03475
+  type: 'test'
+  ...
+# Subtest: completion repair can be disabled explicitly
+ok 105 - completion repair can be disabled explicitly
+  ---
+  duration_ms: 9.0435
+  type: 'test'
+  ...
+# Subtest: output truncation gets a submission-only recovery and cannot execute the truncated edit
+ok 106 - output truncation gets a submission-only recovery and cannot execute the truncated edit
+  ---
+  duration_ms: 15.299833
+  type: 'test'
+  ...
+# Subtest: an unrecovered truncation is reported as an output limit with its reasoning split
+ok 107 - an unrecovered truncation is reported as an output limit with its reasoning split
+  ---
+  duration_ms: 7.967833
+  type: 'test'
+  ...
+# Subtest: reserved finalization exposes only submit_result and adds no requests
+ok 108 - reserved finalization exposes only submit_result and adds no requests
+  ---
+  duration_ms: 15.376458
+  type: 'test'
+  ...
+# Subtest: the hard request limit is not reset by completion repair
+ok 109 - the hard request limit is not reset by completion repair
+  ---
+  duration_ms: 9.319042
+  type: 'test'
+  ...
+# Subtest: a request timeout is labeled independently and does not trigger repair
+ok 110 - a request timeout is labeled independently and does not trigger repair
+  ---
+  duration_ms: 8.854334
+  type: 'test'
+  ...
+# Subtest: the worker deadline stays distinct from the per-request timeout
+ok 111 - the worker deadline stays distinct from the per-request timeout
+  ---
+  duration_ms: 7.0125
+  type: 'test'
+  ...
+# Subtest: the optional idle timeout resets on provider events rather than runner heartbeats
+ok 112 - the optional idle timeout resets on provider events rather than runner heartbeats
+  ---
+  duration_ms: 7.691917
+  type: 'test'
+  ...
+# Subtest: the default idle guard is disabled; the heartbeat checkpoints without generating inference
+ok 113 - the default idle guard is disabled; the heartbeat checkpoints without generating inference
+  ---
+  duration_ms: 9.622084
+  type: 'test'
+  ...
+# Subtest: a candidate checkpoint survives before completion and reverted exports are removed
+ok 114 - a candidate checkpoint survives before completion and reverted exports are removed
+  ---
+  duration_ms: 11.23475
+  type: 'test'
+  ...
+# Subtest: an explicit refusal does not enter the completion-repair loop
+ok 115 - an explicit refusal does not enter the completion-repair loop
+  ---
+  duration_ms: 7.659625
+  type: 'test'
+  ...
+# Subtest: permission violations prevent automatic continuation
+ok 116 - permission violations prevent automatic continuation
+  ---
+  duration_ms: 7.614166
+  type: 'test'
+  ...
+# Subtest: a generation ID from the stream start survives a thrown connection error
+ok 117 - a generation ID from the stream start survives a thrown connection error
+  ---
+  duration_ms: 7.371583
+  type: 'test'
+  ...
+# Subtest: a budget reservation denial exposes its arithmetic without claiming actual spending
+ok 118 - a budget reservation denial exposes its arithmetic without claiming actual spending
+  ---
+  duration_ms: 5.024375
+  type: 'test'
+  ...
+# Subtest: worker-specific limits appear in the report and cap output without reducing reasoning
+ok 119 - worker-specific limits appear in the report and cap output without reducing reasoning
+  ---
+  duration_ms: 7.896667
+  type: 'test'
+  ...
+# Subtest: failure classes separate provider outages and packet problems from model quality
+ok 120 - failure classes separate provider outages and packet problems from model quality
+  ---
+  duration_ms: 0.231583
+  type: 'test'
+  ...
+# Subtest: a moving alias billed under the dated build of its catalog target is the authorized model
+ok 121 - a moving alias billed under the dated build of its catalog target is the authorized model
+  ---
+  duration_ms: 14.852542
+  type: 'test'
+  ...
+# Subtest: a ledger sums phases without merging reported charges into estimates
+ok 122 - a ledger sums phases without merging reported charges into estimates
+  ---
+  duration_ms: 0.453167
+  type: 'test'
+  ...
+# Subtest: legacy artifact diagnosis and the CLI work without a provider key or SDK
+ok 123 - legacy artifact diagnosis and the CLI work without a provider key or SDK
+  ---
+  duration_ms: 42.047583
+  type: 'test'
+  ...
+# Subtest: a redactor that shortens the excerpt is reported as truncation, not as complete output
+ok 124 - a redactor that shortens the excerpt is reported as truncation, not as complete output
+  ---
+  duration_ms: 0.095708
+  type: 'test'
+  ...
+# Subtest: diagnosis of a truncated or malformed run reports unknowns instead of crashing
+ok 125 - diagnosis of a truncated or malformed run reports unknowns instead of crashing
+  ---
+  duration_ms: 1.511417
   type: 'test'
   ...
 # Subtest: runtime check rejects Node versions below the pinned SDK minimum
-ok 89 - runtime check rejects Node versions below the pinned SDK minimum
+ok 126 - runtime check rejects Node versions below the pinned SDK minimum
   ---
-  duration_ms: 1.009464
+  duration_ms: 0.585333
   type: 'test'
   ...
 # Subtest: installed metadata resolves from exported entry, not an unexported package.json
-ok 90 - installed metadata resolves from exported entry, not an unexported package.json
+ok 127 - installed metadata resolves from exported entry, not an unexported package.json
   ---
-  duration_ms: 1.310136
+  duration_ms: 2.2775
   type: 'test'
   ...
 # Subtest: credential resolution prefers environment and status never exposes values
-ok 91 - credential resolution prefers environment and status never exposes values
+ok 128 - credential resolution prefers environment and status never exposes values
   ---
-  duration_ms: 0.855314
+  duration_ms: 1.32525
   type: 'test'
   ...
 # Subtest: private credential files reject broad POSIX access and invalid entries
-ok 92 - private credential files reject broad POSIX access and invalid entries
+ok 129 - private credential files reject broad POSIX access and invalid entries
   ---
-  duration_ms: 0.774732
+  duration_ms: 1.484458
   type: 'test'
   ...
 # Subtest: missing credentials fail without falling back to repository files
-ok 93 - missing credentials fail without falling back to repository files
+ok 130 - missing credentials fail without falling back to repository files
   ---
-  duration_ms: 0.241772
+  duration_ms: 1.220333
   type: 'test'
   ...
 # Subtest: release allowlist excludes root secrets, runtime artifacts, dependencies, and VCS
-ok 94 - release allowlist excludes root secrets, runtime artifacts, dependencies, and VCS
+ok 131 - release allowlist excludes root secrets, runtime artifacts, dependencies, and VCS
   ---
-  duration_ms: 8.118231
+  duration_ms: 11.974791
   type: 'test'
   ...
 # Subtest: release packaging refuses secrets accidentally placed inside distributable folders
-ok 95 - release packaging refuses secrets accidentally placed inside distributable folders
+ok 132 - release packaging refuses secrets accidentally placed inside distributable folders
   ---
-  duration_ms: 0.777306
+  duration_ms: 0.804834
   type: 'test'
   ...
 # Subtest: installer copies source, never dependencies, and refuses to overwrite
-ok 96 - installer copies source, never dependencies, and refuses to overwrite
+ok 133 - installer copies source, never dependencies, and refuses to overwrite
   ---
-  duration_ms: 1.556846
+  duration_ms: 2.020375
   type: 'test'
   ...
 # Subtest: installer parses explicit hosts and preserves Codex as the legacy default
-ok 97 - installer parses explicit hosts and preserves Codex as the legacy default
+ok 134 - installer parses explicit hosts and preserves Codex as the legacy default
   ---
-  duration_ms: 0.482705
+  duration_ms: 0.393625
   type: 'test'
   ...
 # Subtest: personal destinations support both documented layouts and custom Claude config roots
-ok 98 - personal destinations support both documented layouts and custom Claude config roots
+ok 135 - personal destinations support both documented layouts and custom Claude config roots
   ---
-  duration_ms: 1.07967
+  duration_ms: 0.736
   type: 'test'
   ...
 # Subtest: repository installations use repository layouts rather than a personal Claude override
-ok 99 - repository installations use repository layouts rather than a personal Claude override
+ok 136 - repository installations use repository layouts rather than a personal Claude override
   ---
-  duration_ms: 0.562815
+  duration_ms: 1.231041
   type: 'test'
   ...
 # Subtest: both-host installer preflights conflicts before creating either destination
-ok 100 - both-host installer preflights conflicts before creating either destination
+ok 137 - both-host installer preflights conflicts before creating either destination
   ---
-  duration_ms: 0.698357
+  duration_ms: 2.042875
   type: 'test'
   ...
 # Subtest: both-host copies remain complete and never edit repository instruction files
-ok 101 - both-host copies remain complete and never edit repository instruction files
+ok 138 - both-host copies remain complete and never edit repository instruction files
   ---
-  duration_ms: 2.190848
+  duration_ms: 6.219292
   type: 'test'
   ...
 # Subtest: installer rejects dangling symlink destinations without following or deleting them
-ok 102 - installer rejects dangling symlink destinations without following or deleting them
+ok 139 - installer rejects dangling symlink destinations without following or deleting them
   ---
-  duration_ms: 0.95925
+  duration_ms: 1.106834
   type: 'test'
   ...
 # Subtest: release packaging rejects nested learning or host state and case-varied credential files
-ok 103 - release packaging rejects nested learning or host state and case-varied credential files
+ok 140 - release packaging rejects nested learning or host state and case-varied credential files
   ---
-  duration_ms: 1.816636
+  duration_ms: 7.140833
   type: 'test'
   ...
-1..103
-# tests 103
+1..140
+# tests 140
 # suites 0
-# pass 103
+# pass 140
 # fail 0
 # cancelled 0
 # skipped 0
 # todo 0
-# duration_ms 774.407044
+# duration_ms 617.372958

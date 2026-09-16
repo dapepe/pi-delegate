@@ -1,6 +1,6 @@
 {
   "name": "pi",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "private": true,
   "type": "module",
   "description": "Codex and Claude Code skill: controlled multi-model Pi delegation and evidence-backed project learning",

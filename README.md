@@ -91,6 +91,8 @@ Request `xhigh`, or `max` for more complex work. `best_supported` resolves exact
 
 Defaults allow at most three workers, two concurrent, $2 per worker and $5 per **run plan**. These are soft request-boundary guards, not billing guarantees or authorization for repeated $5 phases. The host must track the user's total approved spend across runs. OpenRouter gateway preference and upstream hosting-provider/privacy restrictions are separate settings.
 
+Each worker gets 12 provider requests, 60 tool calls and 600 seconds, with a separate 600-second per-request deadline. The last two requests, the last tool slot and the final 120 seconds are reserved **inside** those limits so the worker submits what it has instead of timing out with nothing; in that window only `submit_result` is accepted. A model that stops without submitting gets one bounded same-session follow-up, and a truncated response gets one submission-only attempt — same model, effort, counters, deadline and ledger, never a fresh run. Candidate edits and counters are checkpointed during the run, so a killed process does not lose finished work. A worker may carry its own smaller `limits`; it can never raise a plan ceiling. See [stops and recovery](docs/troubleshooting.md).
+
 Append the relevant [AGENTS.md configuration example](templates/AGENTS.example.md) to existing human-maintained project instructions. The host resolves instruction precedence and compiles a validated JSON plan; the runner never parses arbitrary Markdown as executable configuration. Set the actual `orchestrator` to `codex` or `claude-code`; assessments use `Codex` or `Claude Code`. See [configuration](docs/configuration.md).
 
 ## Optional project learning
@@ -120,14 +122,15 @@ node scripts/pi.mjs reconcile --out /private/run
 node scripts/pi.mjs verify --out /private/run
 node scripts/pi.mjs report --out /private/run --assessment /private/run/assessment.json
 node scripts/pi.mjs ledger --out /private/runs-for-this-task
+node scripts/pi.mjs diagnose --out /private/run
 node scripts/pi.mjs learn help
 ```
 
-`ledger` is local: it totals the reconciled ledgers of several run directories (the phases of one task) under one parent, labelled for the host. Each worker result also carries a `failure_class` and hint separating provider outages and packet problems from model quality, per-request timing, and the deadline counters of the submit grace window.
+`ledger` is local: it totals the reconciled ledgers of several run directories (the phases of one task) under one parent, labelled for the host. `diagnose` is also local — no key, network or inference — and explains which layer stopped a worker, the allowance it used against the allowance it had, the budget and context admission arithmetic, and what was checkpointed; it reads 1.2.0 and 1.3.0 run directories too. Each worker result carries a `failure_class` and hint separating provider outages and packet problems from model quality, per-request timing, the finishing-window counters, and any `completion: partial` claim with its `remaining_work`.
 
 `check` and `models` use provider metadata, not inference; `doctor`, `verify`, `report` and learning are local. `run` performs **paid inference**. Reconciliation requests billing metadata. The optional `npm run smoke -- --allow-paid` requires explicit approval and uses a public synthetic fixture, not a user's source.
 
-Run folders are outside the task repository, by default under `~/.cache/pi/<run-id>`. They contain normalized plan/snapshot metadata, usage and report files, per-worker structured results/events, candidate patches/files, and the host's optional assessment. No full reasoning transcript is retained, but source snippets and candidate content can still be private. Do not publish run folders. [Artifact/workflow details](docs/workflows.md).
+Run folders are outside the task repository, by default under `~/.cache/pi/<run-id>`. They contain normalized plan/snapshot metadata, usage and report files, per-worker structured results/events, candidate patches/files, and the host's optional assessment. No full reasoning transcript is retained — a bounded excerpt of visible assistant text is kept for diagnosis, never thinking blocks, signatures or raw tool arguments — but source snippets and candidate content can still be private. Do not publish run folders. [Artifact/workflow details](docs/workflows.md).
 
 Reports separate provider-reported charges, unresolved estimates and unknown requests; unknown is never zero. OpenRouter reconciliation uses generation `total_cost` when available and does not add an estimate on top of a reconciled charge. Host costs are excluded and the report names the actual host. Failed/rejected attempts remain in the ledger. [OpenRouter generation metadata](https://openrouter.ai/docs/api/api-reference/generations/get-request-%26-usage-metadata-for-a-generation).
 

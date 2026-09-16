@@ -1,5 +1,92 @@
 # Changelog
 
+## 1.4.0 — 2026-09-16
+
+Merges an independent second review pass into 1.3.0. 1.3.0 answered "the worker stopped and
+produced nothing" with a time-based grace window; this release adds the parts that window could
+not cover — an allowance that reaches the end of a long task, partial work that survives, and an
+honest name for what actually stopped.
+
+### Added — long-running work
+
+- **Reserved finishing allowance.** `finalization_turns` (2) and `finalization_seconds` (120,
+  capped at a quarter of `timeout_seconds`) are reserved *inside* the existing ceilings, never
+  added to them. In that window the worker is offered only `submit_result`, its system prompt says
+  so, and the capability layer refuses every other tool even if the model calls one that was not
+  offered. The last tool slot is reserved the same way. Finalization also starts early when the
+  *next* round trip would not fit the remaining budget or context, so pressure produces a submitted
+  partial result instead of a refusal with nothing to show. This replaces `submit_grace_seconds`,
+  whose 120-second refusal window and tool-result warnings are preserved inside it.
+- **Bounded completion repair** (`max_completion_repairs`, default 1, maximum 3, `0` disables).
+  A model that ends its turn with a plan instead of a submission gets one same-session follow-up
+  with its approved tools; a `length` stop gets a submission-only follow-up and its truncated edit
+  is never replayed. Repairs reuse the same model, effort, request counter, deadline, permissions
+  and cost ledger — they are not fresh runs, and they do not reset any limit.
+- **Mid-run checkpoints.** Candidate files are exported atomically after each completed edit tool,
+  with reverted or deleted exports removed; counters, coverage, submission and usage are written
+  on every request boundary, tool result and heartbeat. A killed process no longer loses finished
+  candidate work. A set of files is still not a transaction.
+- **Independent timers.** `request_timeout_seconds` (600, capped by remaining worker time) makes
+  one slow request distinguishable from a worker that ran out of total time.
+  `stream_idle_timeout_seconds` (0, opt-in) cancels on SDK-event inactivity;
+  `heartbeat_seconds` (15) emits local liveness and a checkpoint without calling any model.
+- **Per-worker `limits`.** A plan agent may reduce `max_turns`, `max_tool_calls`,
+  `timeout_seconds`, `request_timeout_seconds`, `max_output_tokens` and `per_agent_budget_usd`
+  below the plan ceiling. It can never raise one.
+
+### Added — better results
+
+- **Honest outcomes.** `submit_result` takes `completion` (`complete`, `partial`, `blocked`) and
+  `remaining_work`. Partial and blocked claims must name concrete remaining work; a complete claim
+  may not list any. `partial` and `blocked` are their own worker statuses. Legacy submissions
+  without these fields are still accepted. Every claim remains a claim for the host to validate.
+- **`diagnose --out RUN_DIRECTORY`**: local stop diagnosis with no SDK, key, network or inference.
+  It reports the stop layer, recorded versus used allowance, the admission arithmetic, SDK activity
+  timestamps, checkpoints and remaining work. It reads 1.2.0 and 1.3.0 artifacts and derives the
+  classification those runners never recorded.
+- **Salvaged public output.** A bounded, key-scrubbed excerpt of visible assistant text is kept
+  when no submission arrives. Thinking blocks, signatures and raw tool arguments are never stored.
+- **Mechanical tool errors are separated from permission violations.** A failed exact-match
+  replacement used to be recorded as a policy breach; only a denied capability is one now, and a
+  real violation stops the worker instead of letting it continue.
+- **Explicit refusals and identity mismatches bypass the repair loop.** Refusal detection for
+  unstructured text is conservative and best-effort.
+- `failure_class` now covers `partial`, `blocked`, `request_timeout`, `stream_idle_timeout`,
+  `refusal`, `policy_violation` and the unfinished states, and a new learning `failure_kind` of
+  `limit` records a resource failure as operational rather than as poor model reasoning.
+- `check` reports each worker's allocation and finishing reserve and warns about write scope
+  against `max_turns`, a capped `finalization_seconds`, and host-command lifetime.
+- `report.md` renders the stop layer, allowance used versus allocated, finalization trigger,
+  completion claim, remaining work and unvalidated public output.
+
+### Learning
+
+Routing profiles now record the worker's runtime allocation and its companions'. Trials run under
+different allowances are separate profiles and are no longer pooled as the same routing evidence,
+and a resource-limited attempt cannot become a permanent negative verdict on a model. Observations
+retain the stop diagnostic, failure class, allowance usage and recovery events.
+
+**Migration:** profiles recorded before 1.4.0 have no `runtime_limits` and therefore hash to
+different profile IDs than otherwise identical 1.4.0 runs. Existing history stays readable and its
+evidence is preserved; the old and new profiles simply do not pool, so a preference near its
+promotion floor may need one further run under the current allocation before it is promoted again.
+Nothing is rewritten or deleted, and no threshold changed.
+
+### Unchanged boundaries
+
+The 12-request, 60-tool, 600-second, $2-per-worker and $5-per-plan ceilings, the model pool and the
+effort policy are unchanged. No quota reset, effort downgrade, provider retry, automatic fallback,
+persistent transcript resume, detached supervisor, shell tool or automatic integration was added.
+Cancellation remains cooperative: a heartbeat proves the runner's event loop is alive, not that the
+provider is making progress, and it cannot extend the enclosing host command's own lifetime.
+
+### Validation
+
+140 offline tests and 6 installed-SDK synthetic-transport tests pass on macOS with Node 22.23.1.
+No live inference was run for this release; every long-running claim above is tested against
+fixtures and a deterministic fake clock, not against a real provider. See
+[the validation record](references/validation.md) and [the reliability audit](references/reliability-audit.md).
+
 ## 1.3.0 — 2026-09-15
 
 Shaped by the first live session: four runs on a real repository through Claude Code, in

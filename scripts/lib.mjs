@@ -84,10 +84,17 @@ export function mergePolicy(defaults, override = {}) {
   assert(Array.isArray(p.preferred_models) && p.preferred_models.length && p.preferred_models.every(x => typeof x === 'string' && x.length), 'preferred_models must be a nonempty string array');
   assert(['xhigh', 'max'].includes(p.default_effort) && ['xhigh', 'max'].includes(p.complex_effort), 'Default and complex effort must be xhigh or max');
   assert(['best_supported', 'strict'].includes(p.effort_policy), 'effort_policy must be best_supported or strict');
-  for (const k of ['max_agents', 'max_parallel', 'max_turns', 'max_tool_calls', 'timeout_seconds', 'submit_grace_seconds', 'max_output_tokens', 'max_file_bytes', 'max_context_bytes']) {
+  for (const k of ['max_agents', 'max_parallel', 'max_turns', 'max_tool_calls', 'timeout_seconds', 'request_timeout_seconds', 'heartbeat_seconds', 'max_output_tokens', 'max_file_bytes', 'max_context_bytes']) {
     assert(Number.isInteger(p[k]) && p[k] > 0, `${k} must be a positive integer`);
   }
-  assert(p.submit_grace_seconds < p.timeout_seconds, 'submit_grace_seconds must be shorter than timeout_seconds');
+  for (const k of ['stream_idle_timeout_seconds', 'finalization_turns', 'finalization_seconds', 'max_completion_repairs']) {
+    assert(Number.isInteger(p[k]) && p[k] >= 0, `${k} must be a nonnegative integer`);
+  }
+  assert(p.max_completion_repairs <= 3, 'max_completion_repairs must be <=3');
+  assert(p.finalization_seconds < p.timeout_seconds, 'finalization_seconds must be shorter than timeout_seconds');
+  assert(p.finalization_turns < p.max_turns, 'finalization_turns must leave at least one working request');
+  // setTimeout silently misfires past 2^31-1 ms; refuse a value that cannot be armed honestly.
+  for (const k of ['timeout_seconds', 'request_timeout_seconds', 'stream_idle_timeout_seconds', 'heartbeat_seconds']) assert(p[k] <= 86400, `${k} must be <=86400 to avoid timer overflow`);
   for (const k of ['per_agent_budget_usd', 'session_budget_usd']) assert(isNumber(p[k]) && p[k] > 0, `${k} must be positive`);
   assert(typeof p.allow_model_exceptions === 'boolean', 'allow_model_exceptions must be a boolean');
   assert(p.model_aliases && typeof p.model_aliases === 'object' && !Array.isArray(p.model_aliases), 'model_aliases must be an object');
@@ -105,6 +112,21 @@ export function mergePolicy(defaults, override = {}) {
     for (const [k, v] of Object.entries(route.max_price)) assert(['prompt', 'completion', 'request', 'image', 'audio'].includes(k) && isNumber(v), 'max_price contains an invalid key or value');
   }
   return p;
+}
+/**
+ * A per-worker allocation. It may only *reduce* an authorized plan ceiling: a narrow read-only
+ * reviewer can be given less than an implementer in the same plan, but no worker can grant
+ * itself more time, requests, tools, output or budget than the host authorized.
+ */
+export const WORKER_LIMIT_KEYS = ['max_turns', 'max_tool_calls', 'timeout_seconds', 'request_timeout_seconds', 'max_output_tokens', 'per_agent_budget_usd'];
+export function workerPolicy(policy, limits = {}) {
+  assert(limits && typeof limits === 'object' && !Array.isArray(limits), 'Worker limits must be an object');
+  for (const [key, value] of Object.entries(limits)) {
+    assert(WORKER_LIMIT_KEYS.includes(key), `Unknown worker limit: ${key}`);
+    assert(isNumber(value) && value > 0 && (key === 'per_agent_budget_usd' || Number.isInteger(value)), `Invalid worker limit: ${key}`);
+    assert(value <= policy[key], `Worker ${key} cannot exceed the plan ceiling`);
+  }
+  return { ...policy, ...limits };
 }
 export function chooseEffort(requested, supported, policy = 'best_supported') {
   assert(['xhigh', 'max'].includes(requested), 'Requested effort must be xhigh or max');
@@ -177,7 +199,7 @@ export function validatePlan(input, defaults) {
   const agents = input.agents.map(a => {
     assert(a && typeof a === 'object' && !Array.isArray(a), 'Each agent must be an object');
     for (const k of ['read_files', 'write_files']) if (a[k] !== undefined) assert(Array.isArray(a[k]) && a[k].length <= 256, `${k} must be an array of at most 256 paths`);
-    const keys = new Set(['id', 'role', 'task', 'model', 'provider', 'mode', 'read_files', 'write_files', 'effort', 'selection_reason', 'model_exception_reason']);
+    const keys = new Set(['id', 'role', 'task', 'model', 'provider', 'mode', 'read_files', 'write_files', 'effort', 'selection_reason', 'model_exception_reason', 'limits']);
     for (const k of Object.keys(a)) assert(keys.has(k), `Unknown agent field: ${k}`);
     assert(typeof a.id === 'string' && /^[a-z][a-z0-9_-]{0,47}$/.test(a.id) && !ids.has(a.id), 'Agent IDs must be unique, portable lowercase names');
     cleanRel(a.id); // Output directories must also be portable on Windows.
@@ -196,6 +218,7 @@ export function validatePlan(input, defaults) {
     assert(a.mode !== 'write' || writable.length > 0, 'Write agent requires explicit write_files');
     const effort = a.effort || policy.default_effort;
     assert(['xhigh', 'max'].includes(effort), 'Each requested effort must be xhigh or max');
+    workerPolicy(policy, a.limits); // A per-worker allocation may narrow the plan ceiling, never raise it.
     return { ...a, provider, effort, read_files: accessible, write_files: writable };
   });
   const paths = [...new Set([...readFiles, ...agents.flatMap(a => a.write_files)])];
@@ -253,10 +276,17 @@ const resultSchema = schema({
     confidence: { enum: ['high', 'medium', 'low'], type: 'string' },
     file: string(1024), line: { type: 'integer', minimum: 1 }, evidence: string(6000), recommendation: string(6000)
   }) },
-  proposed_tests: strings(30), open_questions: strings(30)
-});
+  proposed_tests: strings(30), open_questions: strings(30),
+  completion: { type: 'string', enum: ['complete', 'partial', 'blocked'] }, remaining_work: strings(30)
+}, ['summary', 'findings', 'proposed_tests', 'open_questions']);
 export function validateSubmission(value, files) {
   text(value.summary, 'summary', 10000);
+  // An honest partial result is worth more than a false completion, so both are accepted — but a
+  // worker that declares unfinished work must say what is left, and a complete claim may not.
+  if (value.completion !== undefined) assert(['complete', 'partial', 'blocked'].includes(value.completion), 'Invalid completion claim');
+  if (value.remaining_work !== undefined) assert(Array.isArray(value.remaining_work) && value.remaining_work.length <= 30 && value.remaining_work.every(s => typeof s === 'string' && s.trim() && s.length <= 5000), 'remaining_work must be a bounded string array');
+  if (['partial', 'blocked'].includes(value.completion)) assert(value.remaining_work?.length > 0, 'Partial or blocked results must identify remaining work');
+  if (value.completion === 'complete') assert(!value.remaining_work?.length, 'A complete result cannot list remaining work');
   assert(Array.isArray(value.findings) && value.findings.length <= 30, 'findings must be an array with <=30 items');
   const ids = new Set();
   for (const f of value.findings) {
@@ -289,14 +319,18 @@ export function authorizedIdentities(metadata = {}) {
 
 /**
  * Explain a worker's terminal status to the host, separating operational failures (which say
- * nothing about the model and may justify one narrowed retry) from limits and refusals that
- * need a decision. `suggested_learning_failure_kind` maps onto the learning vocabulary; it is a
- * suggestion for the host's assessment, never recorded automatically.
+ * nothing about the model and may justify one narrowed retry) from limits, refusals and honest
+ * partial results that need a decision. `suggested_learning_failure_kind` maps onto the learning
+ * vocabulary; it is a suggestion for the host's assessment, never recorded automatically.
+ * Every status here also has an entry in the stop-layer table in runtime.mjs.
  */
-export function classifyStop({ status, warnings = [], usage = null, max_output_tokens = null, timing = null, grace = null, timeout = null }) {
+export function classifyStop({ status, warnings = [], usage = null, max_output_tokens = null, timing = null, finalization_seconds = null, timeout = null, remaining_work = [] }) {
   const out = (failure_class, failure_hint, suggested_learning_failure_kind) => ({ failure_class, failure_hint, suggested_learning_failure_kind });
   if (status === 'completed') return out('none', null, 'none');
   const text = warnings.map(w => String(w)).join(' ');
+  const left = remaining_work.length ? ` The worker named ${remaining_work.length} remaining item(s).` : '';
+  if (status === 'partial') return out('partial', `The worker submitted evidence and declared the assignment unfinished.${left} Its findings may still be useful; the work is not complete. Repacket the remainder rather than retrying the whole task.`, 'none');
+  if (status === 'blocked') return out('blocked', `The worker submitted a blocker rather than a result.${left} Resolve the blocker or narrow the packet; do not widen its authority to work around it.`, 'packet');
   if (status === 'output_limit') {
     const reasoning = usage?.reasoning ?? 0, output = usage?.output ?? 0;
     if (output > 0 && reasoning >= 0.8 * output) {
@@ -304,7 +338,7 @@ export function classifyStop({ status, warnings = [], usage = null, max_output_t
         `The final request spent ${reasoning} of ${output} output tokens on reasoning (limit ${max_output_tokens ?? 'unknown'}) and never called submit_result. ` +
         'Put an explicit submission cap in the task (for example: under 1,200 words, at most 8 findings), narrow the packet, or choose a model that submits earlier. Raising max_output_tokens rarely helps.', 'packet');
     }
-    return out('output_limit', 'The final response hit the output token limit before submit_result. Cap the submission size in the task packet or ask for fewer findings.', 'packet');
+    return out('output_limit', 'The final response hit the output token limit before submit_result, and the submission-only repair did not produce one either. Cap the submission size in the task packet or ask for fewer findings.', 'packet');
   }
   if (status === 'timeout') {
     const mean = timing?.mean_request_seconds, n = timing?.requests ?? 0;
@@ -312,63 +346,84 @@ export function classifyStop({ status, warnings = [], usage = null, max_output_t
     const latency = slow ? ` ${n} request(s) averaged ${Math.round(mean)} s each, so the wall clock went to provider latency rather than to a large packet.` : '';
     return out('timeout',
       `The worker reached timeout_seconds (${timeout ?? 'unknown'}) without submitting.${latency} ` +
-      `Retry at most once with fewer read_files, a higher timeout_seconds, or another authorized model; submit_grace_seconds (${grace ?? 'unknown'}) refused non-submit tools only during the final window.`,
-      slow ? 'provider' : 'packet');
+      `Retry at most once with fewer read_files, a higher timeout_seconds, or another authorized model; the reserved finishing window (${finalization_seconds ?? 'unknown'} s) refused non-submit tools only at the end.`,
+      // Minutes per request is the route's latency, not an allocation the host chose badly.
+      slow ? 'provider' : 'limit');
   }
+  if (status === 'request_timeout') return out('request_timeout', `A single provider request exceeded request_timeout_seconds while the worker deadline still had time left. This is provider latency or a stalled route, not a packet the worker could not finish. Check the per-request timing before raising any limit.`, 'provider');
+  if (status === 'stream_idle_timeout') return out('stream_idle_timeout', 'The opt-in SDK-event idle timer fired. A quiet reasoning model is not necessarily stuck: this guard is disabled by default and proves only that no visible event arrived.', 'provider');
   if (status === 'error') {
     if (/\b429\b|rate.?limit/i.test(text)) return out('provider_rate_limit', 'The provider or gateway rate-limited the request (HTTP 429). Transient, and no evidence about the model: wait and retry once, or use another authorized model.', 'provider');
     if (/\b5\d\d\b|overload|unavailable|ECONN|socket|network|timed? ?out/i.test(text)) return out('provider_error', 'The provider or network failed (5xx or connection error). Transient: retry once later or use another authorized route. Not model-quality evidence.', 'provider');
     return out('error', 'The worker stopped on an error the runner could not classify. Read the warnings before deciding whether a retry is justified.', 'unknown');
   }
+  if (status === 'aborted') return out('aborted', 'The provider or SDK reported an abort. Compare the worker and request timers with the host-command result before assuming a cause.', 'unknown');
   if (status === 'model_mismatch') return out('model_mismatch', 'The provider returned or billed a model identity outside the authorized set. Do not retry blindly; check the alias and catalog identities first.', 'provider');
-  if (['budget_limit', 'budget_reservation_limit'].includes(status)) return out('budget', 'The soft budget was exhausted. A retry needs explicit authorization.', 'host');
-  if (status === 'context_limit') return out('context_limit', 'The packet exceeded the conservative context ceiling. Narrow read_files; do not compact.', 'packet');
-  if (['turn_limit', 'tool_limit'].includes(status)) return out(status, 'The worker used every allowed turn or tool call without submitting. Narrow the task, or tell it to read each file once and then submit.', 'packet');
-  if (status === 'missing_submission') return out('missing_submission', 'The worker ended without calling submit_result and without hitting a recorded limit.', 'unknown');
-  if (status === 'cancelled') return out('cancelled', 'The run was cancelled by the host.', 'host');
+  if (status === 'refusal') return out('refusal', 'A provider or worker refusal was observed. Detection of unstructured refusal text is conservative and best-effort. Do not re-run to circumvent it.', 'model');
+  if (status === 'policy_violation') return out('policy_violation', 'The worker attempted a file action outside its grant and was denied. Inspect the denial and the preserved candidate; do not widen permissions to make the same attempt succeed.', 'model');
+  if (['budget_limit', 'budget_reservation_limit'].includes(status)) return out('budget', `The soft budget guard stopped the worker. ${status === 'budget_reservation_limit' ? 'A reservation is not spent money: inspect last_admission before concluding the budget was consumed.' : ''} A retry needs explicit authorization.`.trim(), 'host');
+  if (status === 'context_limit') return out('context_limit', 'The packet exceeded the conservative byte-based context ceiling, which is not an exact token count. Narrow read_files; do not compact.', 'packet');
+  if (['turn_limit', 'tool_limit'].includes(status)) return out(status, `The worker used every allowed ${status === 'turn_limit' ? 'provider request (tool iterations and completion repairs count)' : 'tool call'} without submitting. Narrow the task, allocate more explicitly, or tell it to read each file once and then submit.`, 'limit');
+  if (status === 'missing_submission') return out('missing_submission', 'The worker ended without calling submit_result, and bounded completion repair did not produce one. Inspect the public output and candidate checkpoint before deciding whether another attempt is worthwhile.', 'unknown');
+  if (status === 'cancelled') return out('cancelled', 'The run was cancelled by the host or an external signal. A caught signal does not identify who sent it.', 'host');
+  if (status === 'orchestration_error') return out('orchestration_error', 'The runner failed outside a normal worker result. Inspect orchestration_errors before any retry.', 'host');
+  if (['running', 'starting'].includes(status)) return out('unfinished', 'No final worker result was recorded. The process may still be live or may have been killed; the artifacts alone do not establish which. Check the host task handle before launching a duplicate.', 'unknown');
+  if (status === 'not_started') return out('not_started', 'This worker was never launched. Inspect the recorded reason and the preceding workers.', 'host');
   return out(String(status), null, 'unknown');
 }
 
-export function createCapabilities(agent, baseline, policy, stopped = () => false, orchestrator = 'codex', deadline = {}) {
+export function createCapabilities(agent, baseline, policy, stopped = () => false, orchestrator = 'codex', controls = {}) {
   const host = hostLabel(orchestrator);
   // The model sees only these Maps. Tools never resolve a model-supplied path against disk.
   const initial = new Map(agent.read_files.map(f => [f, baseline.get(f).content]));
   for (const f of agent.write_files) if (!initial.has(f)) initial.set(f, null);
   const overlay = new Map(initial);
   const writable = new Set(agent.write_files);
-  const state = { submitted: null, tool_calls: 0, policy_violations: [], reads: [], searches: [], deadline: { warnings: 0, refusals: 0 } };
+  const state = { submitted: null, tool_calls: 0, rejected_tool_calls: 0, policy_violations: [], tool_errors: [], reads: [], searches: [], deadline: { warnings: 0, refusals: 0 } };
   const response = value => ({ content: [{ type: 'text', text: typeof value === 'string' ? value : JSON.stringify(value) }], details: {} });
-  const grace = Number.isInteger(policy.submit_grace_seconds) ? policy.submit_grace_seconds : 0;
-  const remaining = () => { const value = deadline.remainingSeconds ? deadline.remainingSeconds() : null; return typeof value === 'number' && Number.isFinite(value) ? value : null; };
+  // The runner reserves finishing allowance at request boundaries; a single request can still
+  // spend minutes in tool calls, so the same reserve is enforced here on every call.
+  const reserve = Number.isInteger(controls.finalizationSeconds) ? controls.finalizationSeconds : 0;
+  const remaining = () => { const value = controls.remainingSeconds ? controls.remainingSeconds() : null; return typeof value === 'number' && Number.isFinite(value) ? value : null; };
   const wrap = (name, description, parameters, fn) => ({
     name, label: name, description, parameters, executionMode: 'sequential',
     execute: async (_id, args, signal) => {
       assert(!signal?.aborted && !stopped(), 'Run is stopped');
       assert(!state.submitted, 'Result already submitted; no further actions permitted');
-      state.tool_calls++;
-      assert(state.tool_calls <= policy.max_tool_calls, 'Tool-call limit reached');
-      // Graceful deadline: a worker that has read everything and times out before writing has
-      // spent the whole budget for nothing. In the final grace window only submit_result is
-      // allowed, and shortly before it every tool result carries the remaining time. Neither is
-      // a policy violation by the worker.
+      // Finalization: a worker that read everything and then ran out of time, tool calls or
+      // turns before writing anything has spent the whole budget for nothing. In the reserved
+      // window only submit_result is accepted. This is not a policy violation by the worker.
       const left = name === 'submit_result' ? null : remaining();
-      if (left !== null && left <= grace) {
-        state.deadline.refusals++;
-        throw new Error(`Time budget nearly spent: about ${Math.max(0, Math.round(left))} s remain. Only submit_result is permitted now. Submit what you have and state what you did not finish.`);
+      const outOfTime = left !== null && reserve > 0 && left <= reserve;
+      if (name !== 'submit_result' && (controls.finalizing?.() || outOfTime || state.tool_calls >= policy.max_tool_calls - 1)) {
+        state.rejected_tool_calls++;
+        if (outOfTime) state.deadline.refusals++;
+        throw new Error(outOfTime
+          ? `Time budget nearly spent: about ${Math.max(0, Math.round(left))} s remain. Only submit_result is permitted now. Submit what you have and set completion to partial with the remaining work.`
+          : 'Finalization only: the remaining allowance is reserved for submit_result. Submit partial or blocked work honestly.');
       }
+      assert(state.tool_calls < policy.max_tool_calls, 'Tool-call limit reached');
+      state.tool_calls++;
       let value;
       try { value = await fn(args); }
-      catch (e) { state.policy_violations.push({ tool: name, message: String(e.message).slice(0, 1000) }); throw e; }
-      if (left !== null && left <= 2 * grace && value?.content?.[0]?.type === 'text') {
+      catch (e) {
+        // An exact-match miss is an ordinary mistake; only a denied capability is a violation.
+        const item = { tool: name, message: String(e.message).slice(0, 1000) };
+        state.tool_errors.push(item);
+        if (e.code === 'PI_POLICY') state.policy_violations.push(item);
+        throw e;
+      }
+      if (left !== null && reserve > 0 && left <= 2 * reserve && value?.content?.[0]?.type === 'text') {
         state.deadline.warnings++;
-        if (state.deadline.warnings === 1 && deadline.onWarning) deadline.onWarning(left);
-        value.content[0].text += `\n\n[pi] About ${Math.max(0, Math.round(left))} s remain before the hard timeout. Call submit_result soon; in the last ${grace} s no other tool is accepted.`;
+        if (state.deadline.warnings === 1 && controls.onWarning) controls.onWarning(left);
+        value.content[0].text += `\n\n[pi] About ${Math.max(0, Math.round(left))} s remain before the hard timeout. Call submit_result soon; in the last ${reserve} s no other tool is accepted.`;
       }
       return value;
     }
   });
-  const requireRead = rel => { cleanRel(rel); assert(overlay.has(rel) && overlay.get(rel) !== null, `File not in readable snapshot: ${rel}`); return overlay.get(rel); };
-  const requireWrite = rel => { checkRel(rel); assert(agent.mode === 'write' && writable.has(rel), `Write not authorized: ${rel}`); };
+  const authorized = fn => { try { return fn(); } catch (e) { e.code = 'PI_POLICY'; throw e; } };
+  const requireRead = rel => authorized(() => { cleanRel(rel); assert(overlay.has(rel) && overlay.get(rel) !== null, `File not in readable snapshot: ${rel}`); return overlay.get(rel); });
+  const requireWrite = rel => authorized(() => { checkRel(rel); assert(agent.mode === 'write' && writable.has(rel), `Write not authorized: ${rel}`); });
   const put = (rel, content) => {
     requireWrite(rel);
     assert(typeof content === 'string' && !content.includes('\0') && Buffer.byteLength(content) <= policy.max_file_bytes, 'Write must be bounded UTF-8 text');
@@ -414,7 +469,7 @@ export function createCapabilities(agent, baseline, policy, stopped = () => fals
       requireWrite(a.path); requireRead(a.path); overlay.set(a.path, null); return response({ staged_deletion: a.path, integrated: false });
     })
   );
-  tools.push(wrap('submit_result', `Submit the final evidence-based proposal to ${host} and finish. Tests are proposed, not executed. Do not rate your own usefulness.`, resultSchema, a => {
+  tools.push(wrap('submit_result', `Submit the final evidence-based proposal to ${host} and finish. Set completion to complete, partial or blocked, and list remaining_work when unfinished. Tests are proposed, not executed. Do not rate your own usefulness.`, resultSchema, a => {
     // Findings for existing paths cite the original snapshot, even after editing/deletion.
     // Findings for newly created paths cite the candidate.
     const evidenceFiles = new Map([...overlay].map(([f, value]) => [f, initial.get(f) ?? value]));

@@ -1,3 +1,23 @@
+# Validation record — pi 1.4.0
+
+## Executed on September 16, 2026 (macOS 27.0, Node 22.23.1)
+
+| Check | Observed result |
+| --- | --- |
+| `npm test` | **140 passed; 0 failures** (110 from 1.3.0, plus 30 covering finalization, bounded repair, independent timers, checkpoints, worker allocations, partial/blocked claims, refusal handling, tool-error separation and `diagnose`) |
+| `npm run check:sdk` | Passed: exports, version pins, effort mapping, Agent construction, diff generation |
+| `npm run test:sdk` | **6 passed** with the installed SDK and synthetic transport (3 from 1.3.0, plus continuation after a premature normal stop, refusal of a length-truncated edit, and a reduced per-worker allocation) |
+| `node --check` on all `.mjs` files | Passed |
+| `npm run package` | Allowlisted contents; no private or runtime files in the release tree |
+
+The runtime tests use an injected clock and timer table rather than real waiting, so every deadline, heartbeat and idle-timeout assertion is deterministic. A fake clock proves the runner's own arithmetic and ordering; it proves nothing about a real provider's latency.
+
+### Not validated for this release
+
+**No live inference was run for 1.4.0.** Every claim about long-running behavior above is tested against fixtures, not against a real provider, host or billing system. The live session recorded under 1.3.0 below motivated this design but was run against the previous runner: it is evidence for the problem, not for the fix. Also unvalidated here: Codex Desktop and Claude Code application behavior, Windows and Linux runtime, the published CI matrix, real cost reconciliation at these settings, and whether the reserved finishing window and bounded repair actually raise the rate of useful submissions. That last question needs a real session with the same models and packets, compared honestly against the 1.3.0 results below.
+
+---
+
 # Validation record — pi 1.3.0
 
 ## Executed on September 15, 2026 (macOS, Node 22.23.1, npm with registry access)

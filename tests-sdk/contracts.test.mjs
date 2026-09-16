@@ -53,3 +53,40 @@ test('real Agent validates tools, exports a candidate, and stops after submissio
     assert.match(fs.readFileSync(path.join(out,'worker/candidate.patch'),'utf8'),/\+export const n = 2;/);
   } finally {fs.rmSync(base,{recursive:true,force:true});}
 });
+
+/** Completion recovery against the real Agent loop: same session, same counters, no replayed edit. */
+async function runScriptedCompletion(t,responses,policy={}) {
+  const base=fs.mkdtempSync(path.join(os.tmpdir(),'pi-sdk-recovery-')),repo=path.join(base,'repo');fs.mkdirSync(repo);fs.writeFileSync(path.join(repo,'a.js'),'export const n = 1;\n');
+  t.after(()=>fs.rmSync(base,{recursive:true,force:true}));
+  let count=0;const payloads=[],provider=openrouterProvider();
+  const input={repo_root:repo,objective:'Synthetic completion recovery',read_files:['a.js'],policy,agents:[{id:'worker',role:'candidate implementer',task:'Inspect n and report',model:model.id,mode:'write',write_files:['a.js'],selection_reason:'SDK fixture'}]};
+  const result=await executeJob(input,path.join(base,'run'),{Agent,runtimeLabel:'installed_sdk_mock_transport',keyFor:()=> 'fixture-key-not-real',createPatch:createTwoFilesPatch,
+    resolve:async()=>({model,metadata:{provider:'openrouter',requested_model:model.id,resolved_model:model.id,requested_effort:'xhigh',effective_pi_effort:'max',configured_provider_effort:'max',max_output_tokens:1000}}),
+    adapter:()=>({streamSimple:(selected,context,options)=>provider.streamSimple(selected,context,{...options,fetch:async(input,init)=>{
+      payloads.push(JSON.parse(await new Request(input,init).text()));assert.ok(count<responses.length,'Recovery exceeded its scripted bound');
+      const r=responses[count++];return sse(`gen-repair-${count}`,r.delta,r.finish);
+    }})}),fetchGeneration:async()=>({data:{total_cost:0.00003,model:model.id}})});
+  return {...result,payloads,repo};
+}
+test('real SDK continuation preserves previous public context after a premature normal stop',{timeout:20000},async t=>{
+  const final={summary:'Scoped review complete',findings:[],proposed_tests:[],open_questions:[],completion:'complete',remaining_work:[]};
+  const r=await runScriptedCompletion(t,[{delta:{content:'I will inspect the file now.'},finish:'stop'},{delta:toolDelta('read_file',{path:'a.js'},'read-2'),finish:'tool_calls'},{delta:toolDelta('submit_result',final,'submit-3'),finish:'tool_calls'}]);
+  assert.equal(r.report.agents[0].status,'completed');assert.equal(r.report.costs.request_count,3);
+  assert.match(JSON.stringify(r.payloads[1].messages),/I will inspect the file now/);
+  assert.equal(r.report.agents[0].recovery_events[0].mode,'bounded_continuation');
+});
+test('real SDK refuses a length-truncated edit and can submit a partial result afterward',{timeout:20000},async t=>{
+  const partial={summary:'Output cap interrupted the candidate',findings:[],proposed_tests:[],open_questions:[],completion:'partial',remaining_work:['Host must reconsider the candidate.']};
+  const r=await runScriptedCompletion(t,[{delta:toolDelta('write_file',{path:'a.js',content:'must not be applied'},'cut-edit'),finish:'length'},{delta:toolDelta('submit_result',partial,'partial-submit'),finish:'tool_calls'}]);
+  assert.equal(r.report.agents[0].status,'partial');assert.equal(r.report.costs.request_count,2);assert.equal(r.report.agents[0].changes.length,0);
+  assert.deepEqual(r.payloads[1].tools.map(t=>t.function.name),['submit_result']);
+  assert.equal(fs.readFileSync(path.join(r.repo,'a.js'),'utf8'),'export const n = 1;\n');
+});
+test('real SDK honours a reduced per-worker allocation without changing reasoning effort',{timeout:20000},async t=>{
+  const r=await runScriptedCompletion(t,[{delta:{content:'Still thinking.'},finish:'stop'}],{max_turns:1,finalization_turns:0,max_completion_repairs:0});
+  // The allocation, not the completion protocol, is the honest reason it stopped.
+  assert.equal(r.report.agents[0].status,'turn_limit');assert.equal(r.report.costs.request_count,1);
+  assert.equal(r.report.agents[0].limits.max_turns,1);assert.equal(r.report.agents[0].recovery_events.length,0);
+  assert.equal(r.payloads[0].reasoning.effort,'max');
+  assert.match(r.report.agents[0].partial_output.text,/Still thinking/);
+});

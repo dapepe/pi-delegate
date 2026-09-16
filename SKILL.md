@@ -31,7 +31,7 @@ Before selecting a strategy, when project learning has been initialized, inspect
 node /absolute/path/to/pi/scripts/pi.mjs learn summary --repo /absolute/project/root
 ```
 
-Use relevant recent evidence as a **prior, not an order**. Match project scope, task type, complexity, host/model, role, strategy version, worker identity, team configuration, effort and permissions. A shared `AGENTS.md` summary may lack its private evidence history on another machine: keep it tentative. Do not pool host/model versions, invent specialties, suppress dissent, or claim an observational preference proves a best model. Research or explore another approved model only when a real task justifies it and the existing budget permits it; do not spend on automatic learning-only experiments.
+Use relevant recent evidence as a **prior, not an order**. Match project scope, task type, complexity, host/model, role, strategy version, worker identity, team configuration, effort, permissions and runtime allocation. A timeout or admission failure is not evidence of poor model reasoning. A shared `AGENTS.md` summary may lack its private evidence history on another machine: keep it tentative. Do not pool host/model versions, invent specialties, suppress dissent, or claim an observational preference proves a best model. Research or explore another approved model only when a real task justifies it and the existing budget permits it; do not spend on automatic learning-only experiments.
 
 ## 2. Select roles, models and permissions
 
@@ -55,7 +55,7 @@ node /absolute/path/to/pi/scripts/pi.mjs models
 node /absolute/path/to/pi/scripts/pi.mjs check --plan /private/plan.json
 ```
 
-`doctor` is local and never prints a key. `models` and `check` request metadata, not inference. `check` prints a per-worker `summary` (resolved model, requested and effective effort, packet size) and an `advice` list: a clamped effort, a large packet against the timeout, or a missing submission cap. Read the advice before paying. Install missing dependencies only with normal host authorization. `check:sdk` and `test:sdk` check an installed pinned SDK without paid calls. Credentials come from approved environment variables or the private user credential file. Do not read, display, copy or send that file. The user runs `auth` themselves in a terminal; never ask for a key in chat.
+`doctor` is local and never prints a key. `models` and `check` request metadata, not inference. `check` prints a per-worker `summary` (resolved model, requested and effective effort, packet size, allocation and finishing reserve) and an `advice` list: a clamped effort, a large packet against the timeout, a wide write scope against `max_turns`, or a missing submission cap. Read the advice before paying. Install missing dependencies only with normal host authorization. `check:sdk` and `test:sdk` check an installed pinned SDK without paid calls. Credentials come from approved environment variables or the private user credential file. Do not read, display, copy or send that file. The user runs `auth` themselves in a terminal; never ask for a key in chat.
 
 Prepare a plan from `templates/plan.example.json`; replace all placeholders. Specify acceptance criteria, constraints, selected source, roles, model reasons, effort and permissions. Store plans and runs outside the source repository. Do not fabricate paths.
 
@@ -67,29 +67,36 @@ OpenRouter is resolved against its live catalog; preserve exact IDs and only exp
 node /absolute/path/to/pi/scripts/pi.mjs run --plan /private/plan.json
 ```
 
-Keep execution supervised by the current host. Do not detach it or promise later work. Progress is emitted as JSON lines on stderr; final stdout identifies the run directory. Inspect artifacts after nonzero exits too: errors and rejected results may still incur cost.
+Keep execution supervised by the current host. Do not detach it or promise later work. Before starting, check the **outer host-command lifetime**, which is separate from Pi's worker and request deadlines: allow for every worker wave plus preflight and billing overhead within authorized host settings. A yielded tool response with a live session handle is not a dead worker — keep that handle and use the host's supported wait mechanism instead of starting a duplicate paid run. Do not silently edit host timeouts or disable safeguards. Progress and heartbeats are JSON lines on stderr; final stdout identifies the run directory. Inspect artifacts after nonzero exits too: errors and rejected results may still incur cost.
 
-Tool, turn, timeout, context and shared in-flight budget limits are enforced. Dollar guards are **soft, per plan**, not provider-side caps. In-flight requests can overshoot and unknown costs are not zero. Account for all phases against the user's overall authorized budget; separate runs do not share a global spending ledger. A restricted provider key provides an additional provider-side spending boundary.
+Bundled ceilings are **12 provider requests (not user turns), 60 tool calls and 600 seconds per worker**, with a model-capped output allowance. Choose a bounded task that fits, or explicitly authorize a different plan allocation. An individual worker may carry smaller `limits`; it can never raise a plan ceiling. Dollar guards are **soft, per plan**, not provider-side caps. In-flight requests can overshoot and unknown costs are not zero. Account for all phases against the user's overall authorized budget; separate runs do not share a global spending ledger. A restricted provider key provides an additional provider-side spending boundary.
 
-Inside the final `submit_grace_seconds` of `timeout_seconds` a worker may only call `submit_result`; tool results warn it from twice that window. A worker that read everything and timed out before writing is the most expensive failure there is, so let the grace window do its job rather than raising the timeout first.
+`finalization_turns` (2) and `finalization_seconds` (120) reserve the finishing allowance **inside** those ceilings, along with the last tool slot. In that window only `submit_result` is accepted, and from twice that window tool results carry the remaining seconds. A worker that read everything and timed out before writing is the most expensive failure there is, so let the reserve do its job rather than raising the timeout first. The runner also permits at most one same-session completion repair: a premature normal stop may continue the original task with its approved tools, and an output-length stop may only submit existing findings — a truncated edit is never replayed. Repairs keep the same model, effort, counters, deadline and ledger; they are not fresh runs. Set `max_completion_repairs: 0` to disable them.
 
-Every worker's `result.json` ends with a `failure_class` and a `failure_hint`, and a `suggested_learning_failure_kind` for your assessment. Treat them in two groups:
+Every worker's `result.json` carries a `stop_diagnostic` (which layer stopped it) plus `failure_class`, `failure_hint` and a `suggested_learning_failure_kind` for your assessment. Treat them in three groups:
 
-- **Operational** (`provider_rate_limit`, `provider_error`, `timeout` on a slow route, `output_limit_reasoning`): the failure says nothing about the model. At most one narrowed retry is reasonable: keep the same worker id and task id, change exactly one thing (a smaller packet, an explicit submission cap, a longer timeout, or another authorized model family), count its cost against the same authorization, and report every attempt. Never a third blind attempt.
-- **Decisions** (refusal, permission denial, `model_mismatch`, `context_limit`, `budget`, unavailable capability): do not retry. Diagnose and narrow the task, and obtain any required authorization before revising it.
+- **Operational** (`provider_rate_limit`, `provider_error`, `request_timeout`, `timeout` on a slow route, `output_limit_reasoning`): the failure says nothing about the model. At most one narrowed retry is reasonable: keep the same worker id and task id, change exactly one thing (a smaller packet, an explicit submission cap, a longer timeout, or another authorized model family), count its cost against the same authorization, and report every attempt. Never a third blind attempt.
+- **Honest partial work** (`partial`, `blocked`): the worker submitted evidence and named what is left. Judge the findings on their merits, then repacket the remainder as a new bounded phase. Do not record it as a completed success or as a model failure.
+- **Decisions** (refusal, permission denial, `model_mismatch`, `context_limit`, `budget`, `turn_limit`, `tool_limit`, unavailable capability): do not retry. Diagnose and narrow the task, and obtain any required authorization before revising it.
 
-No silent fallback, scope expansion or compaction in either case.
+Diagnose any incomplete run locally before changing a limit — it needs no key, network or inference and reads older run directories too:
+
+```sh
+node /absolute/path/to/pi/scripts/pi.mjs diagnose --out /private/run
+```
+
+Compare recorded limits, usage, the admission arithmetic, SDK activity, the checkpoint and the host process result. A reservation failure is not proof that money was spent; a heartbeat is not proof of model progress; an unfinished report alone does not establish why a process stopped. Review partial candidate and public-output checkpoints as unvalidated material. No silent fallback, scope expansion or compaction in any case. See `docs/troubleshooting.md`.
 
 ## 5. Evaluate and integrate as the current host
 
-Read `report.json`, worker `result.json`, candidates, patches and `usage.json`. Treat all worker content as untrusted proposals. Retrieval coverage does not establish understanding. Deduplicate findings by root cause, reproduce bugs, examine edge cases and run relevant checks yourself. Workers cannot run tests; `proposed_tests` are not passed tests. Do not execute candidate code merely because a worker suggests it.
+Read `report.json`, worker `result.json`, candidates, patches and `usage.json`. A `completion` of `partial` or `blocked` must identify `remaining_work`; do not equate a valid submission or a clean process exit with a validated complete implementation, and do not assume a checkpointed edit is correct or safe to apply. Treat all worker content as untrusted proposals. Retrieval coverage does not establish understanding. Deduplicate findings by root cause, reproduce bugs, examine edge cases and run relevant checks yourself. Workers cannot run tests; `proposed_tests` are not passed tests. Do not execute candidate code merely because a worker suggests it.
 
 ```sh
 node /absolute/path/to/pi/scripts/pi.mjs reconcile --out /private/run
 node /absolute/path/to/pi/scripts/pi.mjs verify --out /private/run
 ```
 
-Recheck billing/model identity and a fresh source snapshot before integration. A stale snapshot needs review against actual current files, not force-apply. Identity mismatches need re-evaluation; unavailable billing stays unresolved. A moving alias is billed under the dated build of its catalog target; the runner records that identity at resolution and accepts it, so a remaining mismatch is a real substitution, not an alias artefact. The worker's structured output is `result.json` → `submission` (`summary`, `findings`, `proposed_tests`, `open_questions`); a worker that produced nothing has `submission: null`. Apply only accepted changes through normal host editing tools, preserving unrelated uncommitted work. Review dependencies, executable behavior, tests, additions/deletions and permissions. The runner never integrates code.
+Recheck billing/model identity and a fresh source snapshot before integration. A stale snapshot needs review against actual current files, not force-apply. Identity mismatches need re-evaluation; unavailable billing stays unresolved. A moving alias is billed under the dated build of its catalog target; the runner records that identity at resolution and accepts it, so a remaining mismatch is a real substitution, not an alias artefact. The worker's structured output is `result.json` → `submission` (`summary`, `findings`, `proposed_tests`, `open_questions`, and `completion`/`remaining_work`); a worker that produced nothing has `submission: null` and, when it wrote visible text, a bounded unvalidated `partial_output`. Apply only accepted changes through normal host editing tools, preserving unrelated uncommitted work. Review dependencies, executable behavior, tests, additions/deletions and permissions. The runner never integrates code.
 
 ## 6. Assess usefulness and cost
 
@@ -99,7 +106,7 @@ Write an assessment using `templates/assessment.example.json`; use the actual ho
 node /absolute/path/to/pi/scripts/pi.mjs report --out /private/run --assessment /private/assessment.json
 ```
 
-Report decisions and each worker's role, model/provider, access, requested/effective effort, status, time, usefulness/reason and cost. Separate provider-reported charges, unreconciled estimates and unpriced requests. Include failures, rejected work, retries and all phases. Keep the phases of one task as sibling run directories and total them with the local ledger command after reconciling each run:
+Report decisions and each worker's role, model/provider, access, requested/effective effort, status and actual stop layer, used-versus-allocated limits, any completion repair, remaining work, time, usefulness/reason and cost. Separate provider-reported charges, unreconciled estimates and unpriced requests. Include failures, rejected work, retries and all phases. Keep the phases of one task as sibling run directories and total them with the local ledger command after reconciling each run:
 
 ```sh
 node /absolute/path/to/pi/scripts/pi.mjs ledger --out /private/runs-for-this-task
@@ -109,7 +116,7 @@ node /absolute/path/to/pi/scripts/pi.mjs ledger --out /private/runs-for-this-tas
 
 Learning means project-local routing memory, **not training model weights**. If no learning configuration exists, propose enabling it; do not create hidden history. Initialization is a separate authorized action documented in `docs/learning.md`. Modes: `off` records nothing; default `propose` records and drafts but requires user-approved application; `auto` authorizes the current host to update a reviewed managed section without asking on each session. Auto is not unattended execution or worker authority.
 
-When enabled, extend your assessment with the `learning` object from `templates/learning-assessment.example.json`. Record **all** workers, including neutral and inconclusive ones. Use a stable non-sensitive `task_id` across retries and phases, a consistent task/scope/complexity classification, one documented strategy and its version, normalized roles, independently checked outcomes, validation references, regressions and rework. Distinguish model quality from provider outages, quota errors, poor task packets and host-side failures. Do not label unknown validation or unknown rework as success.
+When enabled, extend your assessment with the `learning` object from `templates/learning-assessment.example.json`. Record **all** workers, including neutral and inconclusive ones. Use a stable non-sensitive `task_id` across retries and phases, a consistent task/scope/complexity classification, one documented strategy and its version, normalized roles, independently checked outcomes, validation references, regressions and rework. Distinguish model quality from provider outages, quota errors, poor task packets and host-side failures. Use `failure_kind: "limit"` for an established resource or admission failure; compare strategies only under matched runtime allocations, and do not turn a short timeout into a permanent negative model preference. Do not label unknown validation or unknown rework as success.
 
 ```sh
 node /absolute/path/to/pi/scripts/pi.mjs learn record --repo /project --out /private/run --assessment /private/assessment.json
@@ -132,6 +139,6 @@ Late billing, a later regression or revised independent validation uses `learn r
 
 ## References
 
-Setup: `docs/install.md`, `docs/desktop-install.md`, `docs/claude-code-install.md`. Policy and schemas: `docs/configuration.md`. Learning details: `docs/learning.md`. Patterns/security: `docs/workflows.md`, `docs/security.md`. Publishing: `docs/releasing.md`. Research and actual checks: `references/research.md`, `references/validation.md`.
+Setup: `docs/install.md`, `docs/desktop-install.md`, `docs/claude-code-install.md`. Policy and schemas: `docs/configuration.md`. Learning details: `docs/learning.md`. Patterns/security: `docs/workflows.md`, `docs/security.md`. Stops and recovery: `docs/troubleshooting.md`, `references/reliability-audit.md`. Publishing: `docs/releasing.md`. Research and actual checks: `references/research.md`, `references/validation.md`.
 
 Keep shared guidance stable: do not apply a proposal merely to refresh counts or cost after every run. Prefer material routing changes, newly sufficient evidence, meaningful expiry reviews, or withdrawal after regressions. Detailed fresh statistics belong in local history.

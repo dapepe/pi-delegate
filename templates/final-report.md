@@ -12,6 +12,8 @@
 
 **Rejected or deferred:** [Recommendation and host's evidence-based reason; no majority vote.]
 
+**Stopping and recovery:** [Worker status and the specific stop layer; requests, tools and time used versus allocated; conservative reservation versus actual spending; any same-session repair; remaining work and checkpoint location. An unfinished artifact does not by itself establish an external timeout.]
+
 **Validation and integration:** [Actual commands/results, accepted changes, untested behavior and remaining uncertainty. Worker-proposed tests are not passed tests.]
 
 **Cost:** [Provider-reported Pi charges, separate unresolved estimates/unpriced requests and accounting coverage. Include failed/rejected attempts and all phases where known.] Excludes [actual host]. Unknown is not $0; per-plan budgets are not total-workflow caps.

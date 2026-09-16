@@ -81,3 +81,31 @@ test('the public learn CLI supports local Claude setup and rejects unused flags 
   const run=(...args)=>spawnSync(process.execPath,[cli,'learn',...args],{encoding:'utf8',env:{...process.env,OPENROUTER_API_KEY:''}});
   try{let r=run('init','--repo',base,'--mode','auto','--claude-import');assert.equal(r.status,0,r.stderr);assert.equal(JSON.parse(r.stdout).mode,'auto');assert.equal(fs.readFileSync(path.join(base,'CLAUDE.md'),'utf8'),'@AGENTS.md\n');r=run('summary','--repo',base);assert.equal(r.status,0,r.stderr);assert.deepEqual(JSON.parse(r.stdout).profiles,[]);r=run('summary','--repo',base,'--approve');assert.equal(r.status,1);assert.match(r.stderr,/not used/);}finally{fs.rmSync(base,{recursive:true});}
 });
+
+test('limit failures stay operational rather than negative model-quality evidence',()=>withFixture(f=>{
+  fill(f);const r=f.make(4,{outcome:'inconclusive',failure:'limit'});r.report.agents[0].status='turn_limit';r.save();r.record();
+  const p=summary(f).profiles[0];assert.equal(p.operational_failures,1);assert.equal(p.quality_evaluated_tasks,3);assert.equal(p.harmful_tasks,0);
+}));
+test('different runtime allocations cannot be pooled as the same model strategy',()=>withFixture(f=>{
+  for(let i=1;i<=2;i++){const r=f.make(i);r.plan.policy.max_turns=i===1?12:32;r.plan.policy.timeout_seconds=i===1?600:1800;r.save();r.record();}
+  const profiles=summary(f).profiles;assert.equal(profiles.length,2);assert.equal(profiles[0].distinct_tasks,1);assert.equal(profiles[1].distinct_tasks,1);
+}));
+test('promoted guidance shows the recorded allocation without granting a larger one',()=>withFixture(f=>{
+  for(let i=1;i<=3;i++){const r=f.make(i);r.plan.policy.max_turns=32;r.plan.policy.timeout_seconds=1800;r.save();r.record();}
+  const proposal=proposeLearning(f.repo,{now:NOW});assert.match(proposal.block,/32 requests/);assert.match(proposal.block,/1800 worker seconds/);assert.match(proposal.block,/not permission to increase/);
+}));
+test('a partial worker result keeps its stop diagnostic in the observation',()=>withFixture(f=>{
+  const r=f.make(1,{outcome:'inconclusive',failure:'limit'});
+  r.report.agents[0].status='partial';
+  r.report.agents[0].stop_diagnostic={layer:'partial',advice:'Review remaining_work.'};
+  r.report.agents[0].failure_class='partial';
+  r.report.agents[0].limit_usage={requests:9,tool_calls:41,elapsed_seconds:512,completion_repairs:1};
+  r.report.agents[0].recovery_events=[{type:'completion_repair',trigger:'missing_submission',mode:'bounded_continuation'}];
+  r.save();r.record();
+  const history=JSON.parse(fs.readFileSync(path.join(f.repo,'.pi/learning/history.json'),'utf8'));
+  const observation=history.runs.at(-1).current.observations.at(-1);
+  assert.equal(observation.stop_diagnostic.layer,'partial');
+  assert.equal(observation.failure_class,'partial');
+  assert.equal(observation.limit_usage.completion_repairs,1);
+  assert.equal(observation.recovery_events[0].mode,'bounded_continuation');
+}));

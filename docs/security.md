@@ -8,6 +8,14 @@ Snapshots reject sensitive path patterns, symlinks, traversal, binaries, unbound
 
 The runner exports candidates outside the source repository, refuses an existing run output directory, and does not execute candidate text. Models cannot mutate another worker's candidate map. Submissions terminate tool use; findings must reference available files and in-range lines. This validates structure, not truth.
 
+## Runtime and checkpoint boundary
+
+Finalization and completion repair cannot grant additional permissions, switch models, lower effort, reset counters or start a fresh budget. A length-truncated edit is never executed or replayed. Refusal detection for unstructured text is conservative and best-effort, not a universal classifier. Permission denials and explicit refusal signals do not authorize automatic continuation; a denied capability stops the worker.
+
+Candidate files and metadata are checkpointed with atomic per-file replacements; a set of files is not a transaction. A crash can leave mismatched generations or lose the latest event. Review candidate hashes and source staleness before integration. A bounded public assistant-text excerpt is retained for diagnosis, but structured thinking blocks, signatures and raw tool arguments are not persisted. Public text and candidates can still contain selected source: keep run directories private and inspect them before sharing.
+
+Worker, request and optional SDK-event idle timers use cooperative SDK abort. They do not forcibly kill a blocked dependency or provide worker-process isolation. Heartbeats indicate event-loop liveness, not provider progress, and they do not extend outer host timeouts. No detached supervisor or durable transcript resume is implemented. See [troubleshooting](troubleshooting.md).
+
 ## What this does not guarantee
 
 This is **not an operating-system sandbox**, independent security audit, or protection against a compromised Node binary, SDK dependency, host, provider, privileged local user, or malicious actor executing arbitrary code as the same user. The trusted host process has filesystem and network capabilities that are not exposed as model tools. Prompt instructions are not themselves a security boundary.

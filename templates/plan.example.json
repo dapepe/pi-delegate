@@ -13,7 +13,11 @@
     "max_agents": 2,
     "max_parallel": 2,
     "per_agent_budget_usd": 2,
-    "session_budget_usd": 4
+    "session_budget_usd": 4,
+    "max_turns": 12,
+    "max_tool_calls": 60,
+    "timeout_seconds": 600,
+    "request_timeout_seconds": 600
   },
   "read_files": [
     "src/cache.ts",
@@ -40,6 +44,11 @@
       "mode": "read",
       "write_files": [],
       "effort": "max",
+      "limits": {
+        "max_turns": 8,
+        "max_tool_calls": 30,
+        "timeout_seconds": 420
+      },
       "selection_reason": "Obtain an independent view from a different model family before seeing the implementer's conclusions.",
       "task": "Independently analyze the invalidation behavior. Find concrete edge cases and propose tests. Give source evidence and state uncertainty. Do not produce or evaluate another worker's patch."
     }

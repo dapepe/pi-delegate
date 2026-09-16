@@ -72,3 +72,20 @@ These are research reports/preprints, not validation of **this** implementation 
 ## What not to add without separate evaluation
 
 Do not attach a self-improvement hook to every turn, let workers rewrite policy, treat repeated attempts as independent wins, call more models merely to populate a leaderboard, or optimize only reported worker cost while ignoring host rework and later regressions. Prefer occasional justified alternative-model trials on real tasks, within existing authorization. Keep final selection with the host and make individual decisions auditable.
+
+## 1.4.0 reliability follow-up — checked September 15, 2026
+
+This pass focused on early stopping rather than broader agent autonomy. It compared documented behavior, not benchmark results. The exact local findings/fixes and remaining limitations are in [the reliability audit](reliability-audit.md).
+
+| Primary source | Relevant behavior and scope | Decision for this project |
+| --- | --- | --- |
+| [Pi Agent loop 0.85.1](https://raw.githubusercontent.com/earendil-works/pi/v0.85.1/packages/agent/src/agent-loop.ts) and [lifecycle](https://raw.githubusercontent.com/earendil-works/pi/v0.85.1/packages/agent/src/agent.ts) | Natural stop, follow-up handling, cooperative abort and rejected truncated tool calls | Bounded same-session repair; submission-only after length; no replayed mutation |
+| [nicobailon tool reference](https://raw.githubusercontent.com/nicobailon/pi-subagents/main/docs/tool-reference.md) | Thirty-minute default only for specified run modes; async single-agent pre-deadline checkpoints; soft/hard budgets; retained resume and writer-specific cautions | Reserve finalization within existing limits, narrow writer tasks, distinguish configured deadline from safe completion |
+| [nicobailon observability](https://raw.githubusercontent.com/nicobailon/pi-subagents/main/docs/observability.md) | Explicit lifecycle artifacts and inspectable progress | Candidate/metadata checkpoints and a dependency-free diagnostic command, not terminal scraping |
+| [tintinweb graceful limits](https://raw.githubusercontent.com/tintinweb/pi-subagents/master/README.md) | Wrap-up steering and five grace turns; notification grouping timeout is not worker termination | Separate finalization from hard stop, but reserve rather than silently add turns |
+| [Claude SDK subagents](https://code.claude.com/docs/en/agent-sdk/subagents) | Resumable custom/general-purpose workers and partial max-turn results; marking requires 2.1.246+ | Honest partial/blocked schema; clearly disclose that this project has no persistent transcript resume |
+| [Claude environment variables](https://code.claude.com/docs/en/env-vars) | Separate Bash, API and subagent-stall timers | Check the enclosing host-command lifetime; do not assume Claude's API timeout configures Pi |
+| [Codex unified-exec interface](https://raw.githubusercontent.com/openai/codex/main/codex-rs/core/src/tools/handlers/unified_exec.rs) and [command handling](https://raw.githubusercontent.com/openai/codex/main/codex-rs/core/src/tools/handlers/unified_exec/exec_command.rs) | Separate yield/wait and process timeout controls | Keep actual live task handles; no duplicate run after a mere yield; installed tool contract takes precedence |
+| [OpenRouter reasoning/output accounting](https://openrouter.ai/docs/guides/best-practices/reasoning-tokens) | Reasoning competes with visible output on most providers; a length stop can consume paid output without a visible answer | Preserve effort policy, disclose output/admission numbers, prefer small edits and deliberate allocations |
+
+Resource failures are now recorded separately from quality outcomes, and routing profiles include runtime allowances. This is a correction for confounding in local observational history, not a claim to remove selection bias or establish causality.

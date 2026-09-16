@@ -16,7 +16,7 @@ The host groups duplicates by root cause, reproduces important claims, and compa
 
 When context is unclear, delegate a small read-only scout task first. Its artifact should identify relevant code, observable behavior, and missing information. The host reads that result and decides which source to inspect and what implementation work to authorize.
 
-Only then create a new plan for candidate work. Carry forward selected verified facts and acceptance criteria, not the scout's full conversation or instructions. The runner has no automatic resume/compaction/chain command, and the scout cannot grant permissions to another worker.
+Only then create a new plan for candidate work. Carry forward selected verified facts and acceptance criteria, not the scout's full conversation or instructions. The runner has no cross-process resume/compaction/chain command, and the scout cannot grant permissions to another worker.
 
 ## Candidate implementer plus baseline reviewer
 
@@ -32,7 +32,7 @@ Prefer independent files or logically separable changes. Even though each worker
 
 ## Evidence-backed project learning
 
-After independent validation, the current primary host may record an assessment when learning is explicitly enabled. Same-task retries/phases retain one task identifier; roles, team, host/model/version, effort, permission and task scope remain part of the profile. Raw local history is ignored, not uploaded. Only eligible host-reviewed advisory preferences may enter the marked `AGENTS.md` section.
+After independent validation, the current primary host may record an assessment when learning is explicitly enabled. Same-task retries/phases retain one task identifier; roles, team, host/model/version, effort, permission, runtime allocation and task scope remain part of the profile. Raw local history is ignored, not uploaded. Only eligible host-reviewed advisory preferences may enter the marked `AGENTS.md` section.
 
 `record`/`summary`/`propose` do not modify instructions. A separately reviewed `apply` does; `propose` mode also needs user approval, while `auto` is explicit local opt-in. No training, reflection-model call, autonomous recursion or Git commit occurs. See [learning](learning.md) for thresholds, late regression corrections and limits.
 
@@ -45,8 +45,15 @@ Read the worker's `failure_class` before deciding anything. Three failures obser
 - **A slow route timed out after reading everything.** The per-request timing shows minutes per turn; the packet was not the problem. Retry once with the same worker id and task, fewer files, and either a longer `timeout_seconds` or another authorized family. The grace window makes the worker submit what it has before the cut-off, so a second timeout with no output means the route, not the task.
 - **Upstream rate limit (429).** Wait, or move to another authorized model. Record it as a provider failure in the assessment; it is not evidence about the model's quality either way.
 - **The whole output budget went to reasoning.** The model never called `submit_result`. Add an explicit cap to the task packet (word count and finding count), keep the packet small, and prefer a model that submits early. Raising `max_output_tokens` rarely helps.
+- **It stopped without submitting, or submitted `partial`.** Run [`diagnose`](troubleshooting.md) first. Bounded repair has already spent one follow-up; a second attempt on the same packet is unlikely to differ. Review the candidate checkpoint and the unvalidated public output, then repacket only the remaining work as a new phase with the original task ID.
 
 One narrowed retry per failure kind, changing exactly one thing, is the limit. Keep every phase's run directory and total them with `ledger`; a retry costs money whether or not it produces anything.
+
+## Preserve partial work without pretending it is complete
+
+Use [local diagnosis](troubleshooting.md) after any incomplete run, including old 1.2.0 and 1.3.0 artifacts. Review the last candidate checkpoint, source staleness, `remaining_work`, the admission arithmetic and the host process result. A model that ended without a structured result already received a bounded same-session repair; a truncated response already received a submission-only attempt. Neither started a new budget or extended a deadline.
+
+After a killed process there is no persistent resume command. The host may construct a new authorized packet from verified checkpoint facts, preserving the real task ID and accounting for earlier cost. Do not replay a partial edit blindly, and do not promote a resource-limited attempt into a model-quality verdict. For long implementations, authorize a fitting allocation and outer command lifetime, or split the work into smaller phases.
 
 ## Spending and stopping
 
