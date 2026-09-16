@@ -236,3 +236,25 @@ test('findings keep original evidence lines after candidate deletion', async () 
     assert.equal(caps.state.submitted.findings[0].line, 3);
   } finally { f.cleanup(); }
 });
+
+test('every shipped example and template validates against the bundled defaults',()=>{
+  // A hand-edited defaults.json once silently replaced two pool models; the examples caught it.
+  const defaults=JSON.parse(fs.readFileSync(path.join(root,'defaults.json'),'utf8'));
+  for(const f of ['examples/read-only.plan.json','examples/claude-code.plan.json','examples/implementation.plan.json','templates/plan.example.json']){
+    const plan=JSON.parse(fs.readFileSync(path.join(root,f),'utf8'));
+    const repo=fs.mkdtempSync(path.join(os.tmpdir(),'pi-example-'));
+    try{
+      for(const rel of plan.read_files){const t=path.join(repo,...rel.split('/'));fs.mkdirSync(path.dirname(t),{recursive:true});fs.writeFileSync(t,'// fixture\n');}
+      const valid=validatePlan({...plan,repo_root:repo},defaults);
+      assert.ok(valid.agents.length>0,`${f} has no agents`);
+      for(const a of valid.agents) assert.ok(defaults.preferred_models.includes(a.model)||a.model_exception_reason,`${f}: ${a.model} is outside the preferred pool without a stated exception`);
+    } finally {fs.rmSync(repo,{recursive:true,force:true});}
+  }
+});
+test('the documented model pool in README matches the bundled defaults',()=>{
+  const defaults=JSON.parse(fs.readFileSync(path.join(root,'defaults.json'),'utf8'));
+  const readme=fs.readFileSync(path.join(root,'README.md'),'utf8');
+  const block=readme.match(/preferred pool:\n+```text\n([^`]+)```/);
+  assert.ok(block,'README no longer documents the preferred pool in a text block after "preferred pool:"');
+  assert.deepEqual(block[1].trim().split('\n').map(s=>s.trim()),defaults.preferred_models);
+});

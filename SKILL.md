@@ -1,6 +1,6 @@
 ---
 name: pi
-description: Delegate bounded coding investigations, independent reviews, design alternatives, or candidate edits through Pi to selected models. The current Codex or Claude Code host controls permissions, validates and integrates results, reports usefulness and cost, and maintains authorized project-local routing lessons. Use for valuable independent work, not trivial edits or unauthorized external sharing.
+description: Delegate bounded coding investigations, independent reviews, design alternatives, or candidate implementations through Pi to selected models. Workers can write candidate edits in an isolated overlay; the host applies what it accepts. The current Codex or Claude Code host controls permissions, validates and integrates results, reports usefulness and cost, and maintains authorized project-local routing lessons. Use for valuable independent work, not trivial edits or unauthorized external sharing.
 ---
 
 # pi
@@ -41,7 +41,16 @@ Request `xhigh` for bounded work and `max` for broad, consequential or subtle wo
 
 Each worker needs explicit `mode: read` or `mode: write`, exact `read_files` and, for write mode, exact `write_files`. No directories, globs, symlinks, credentials, binaries, whole-repository dumps or agent configuration. `AGENTS.md`, overrides, `CLAUDE.md`, local Claude instructions and `.pi` learning state are not delegable. Summarize relevant authorized instructions yourself into the task packet. Existing write targets must also be readable by that worker; explicitly authorized new paths may be absent.
 
-Put an explicit submission cap in the packet (for example: under 1,200 words, at most eight findings) and tell the worker to read each file once and then submit. A model can spend its entire output budget on reasoning and submit nothing; a cap is what stops that. Keep a packet to a handful of files on a slow route: some strong-reasoning routes take about two minutes per turn, even for a tool call, and a dozen files does not fit inside the default timeout there.
+Packet a **reviewer** tightly: an explicit submission cap (for example under 1,200 words, at most eight findings), and an instruction to read each file once and then submit. A model can spend its entire output budget on reasoning and submit nothing; a cap is what stops that. Keep the packet to a handful of files on a slow route, where some strong-reasoning routes take about two minutes per turn even for a tool call.
+
+Packet an **implementer** differently — a cap on findings is not a cap on an edit, and the defaults are sized for a bounded review:
+
+- Name every path in `write_files`, including files that do not yet exist. There are no globs, so a worker cannot create a path you did not authorize.
+- Allocate for writing. Raise `max_turns`, `max_tool_calls` and `timeout_seconds` in the plan `policy` for a multi-file change, then use per-worker `limits` to keep the reviewer in the same plan *below* that ceiling. Read the `check` advice before paying.
+- State the acceptance criteria and the smallest acceptable change, and tell it to prefer `replace_text` over rewriting whole files: a large rewrite is the usual way an output allowance is exhausted mid-edit.
+- Ask for a finished change or an honest `partial` with `remaining_work`. Do not reward a confident `complete`; you still validate it.
+
+Splitting scout, implementation and independent verification into separate phases beats asking one worker to investigate everything and deliver a broad rewrite.
 
 Independent first passes receive the same factual baseline and acceptance criteria, **not each other's conclusions or model-performance history**. Candidate overlays are not shared. A same-plan reviewer sees the original snapshot, not another worker's patch. To review a candidate, inspect it yourself, prepare a scoped temporary snapshot and authorize a later read-only plan. Keep the original task ID across phases/retries. Do not run worker-supplied scripts or copy worker text into authoritative instructions.
 

@@ -4,7 +4,7 @@
 
 | Check | Observed result |
 | --- | --- |
-| `npm test` | **140 passed; 0 failures** (110 from 1.3.0, plus 30 covering finalization, bounded repair, independent timers, checkpoints, worker allocations, partial/blocked claims, refusal handling, tool-error separation and `diagnose`) |
+| `npm test` | **142 passed; 0 failures** (110 from 1.3.0, plus 32 covering finalization, bounded repair, independent timers, checkpoints, worker allocations, partial/blocked claims, refusal handling, tool-error separation, `diagnose`, and a guard that every shipped example plan validates against the bundled defaults) |
 | `npm run check:sdk` | Passed: exports, version pins, effort mapping, Agent construction, diff generation |
 | `npm run test:sdk` | **6 passed** with the installed SDK and synthetic transport (3 from 1.3.0, plus continuation after a premature normal stop, refusal of a length-truncated edit, and a reduced per-worker allocation) |
 | `node --check` on all `.mjs` files | Passed |

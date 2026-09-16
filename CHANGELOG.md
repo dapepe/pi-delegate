@@ -82,7 +82,7 @@ provider is making progress, and it cannot extend the enclosing host command's o
 
 ### Validation
 
-140 offline tests and 6 installed-SDK synthetic-transport tests pass on macOS with Node 22.23.1.
+142 offline tests and 6 installed-SDK synthetic-transport tests pass on macOS with Node 22.23.1.
 No live inference was run for this release; every long-running claim above is tested against
 fixtures and a deterministic fake clock, not against a real provider. See
 [the validation record](references/validation.md) and [the reliability audit](references/reliability-audit.md).

@@ -1,12 +1,16 @@
 # pi Delegate
 
-**Codex or Claude Code decides. Pi workers investigate, challenge, and propose.**
+**Codex or Claude Code decides. Pi workers investigate, challenge, implement, and propose.**
 
-A standalone skill for bounded multi-model coding delegation through Pi. The current host selects models, roles, context, thinking effort and permissions; independently validates the results; and alone decides what to integrate. Optional project-local learning turns validated outcomes into compact, reviewed routing preferences in `AGENTS.md`.
+A standalone skill for bounded multi-model coding delegation through Pi. The current host selects models, roles, context, thinking effort and permissions; independently validates the results; and alone decides what to integrate. Workers can review *and* implement: a `mode: write` worker edits an isolated candidate overlay and hands back a patch, never the real checkout. Optional project-local learning turns validated outcomes into compact, reviewed routing preferences in `AGENTS.md`.
 
 The repository root is the complete skill. Its name and install directory are **pi** on both hosts. This is an independent MIT-licensed project, not an official OpenAI, Anthropic, Pi or OpenRouter product.
 
-**Validation:** 110 dependency-free tests pass, and the installed-SDK checks pass on macOS with Node 22.23. Live inference and billing reconciliation have been exercised in one real four-run session (Claude Code host, OpenRouter); real host-application discovery on Codex Desktop remains unexercised. See [the exact validation record](references/validation.md); this is not an audited security boundary or a benchmark of the preferred models.
+## Why I built this
+
+I created the `/pi` skill to experiment with alternative models. So far the experience has been great: other models uncovered issues the primary model did not notice, and I got more out of my 5-hour limit by deliberately using cheaper models for the implementation.
+
+I am curious to learn how others use different models and skills — happy to discuss on [X](https://x.com/pepehaider).
 
 ## Install
 
@@ -95,6 +99,29 @@ Each worker gets 12 provider requests, 60 tool calls and 600 seconds, with a sep
 
 Append the relevant [AGENTS.md configuration example](templates/AGENTS.example.md) to existing human-maintained project instructions. The host resolves instruction precedence and compiles a validated JSON plan; the runner never parses arbitrary Markdown as executable configuration. Set the actual `orchestrator` to `codex` or `claude-code`; assessments use `Codex` or `Claude Code`. See [configuration](docs/configuration.md).
 
+## Delegating implementation
+
+A worker with `mode: "write"` gets `write_file`, `replace_text` and `delete_file` against an **in-memory overlay** of the files you named in `write_files`. It never touches your checkout. Completed edits are exported to the run directory as `candidate/<path>` plus a unified `candidate.patch`, and you apply what you accept with your own editing tools.
+
+```json
+{
+  "id": "implementer",
+  "mode": "write",
+  "write_files": ["src/cache.ts", "src/cache.test.ts"],
+  "limits": { "max_turns": 24, "max_tool_calls": 100, "timeout_seconds": 1200 }
+}
+```
+
+Three things matter more for an implementer than for a reviewer:
+
+- **Name every path up front**, including files that do not exist yet. There are no globs or directories, so a worker cannot create a file you did not authorize. Existing targets must also be readable by that worker.
+- **Allocate for writing.** The defaults (12 provider requests, 60 tool calls, 600 seconds) suit a bounded review. A multi-file change needs more, set in the plan `policy`; a per-worker `limits` block can then hold each role *below* that ceiling. `check` warns when a wide `write_files` meets a small `max_turns`.
+- **Ask for a finished change or an honest `partial`.** Workers declare `completion` as `complete`, `partial` or `blocked` and must list `remaining_work` when unfinished — better a submitted half with a named remainder than a confident claim you have to discover is wrong.
+
+A productive pattern is a cheaper model implementing under a larger allocation, then a different family reviewing the result read-only. The reviewer in the same plan sees the original snapshot, not the candidate patch; to have a candidate reviewed, inspect it yourself and authorize a later read-only plan against it.
+
+**The runner never integrates code.** No worker can run commands, execute tests, commit, push or apply a patch, and no command in this skill writes to your repository. That boundary is what makes it reasonable to point an unfamiliar model at your source. Run `verify` before applying: it re-checks the snapshot so you do not paste a patch onto files that changed underneath it.
+
 ## Optional project learning
 
 Learning is a project-specific routing aid, **not model training or an autonomous self-improvement loop**. The host records validated outcomes, reviews aggregated evidence, then decides what is worth promoting. Workers cannot assess themselves or write instructions.
@@ -140,7 +167,7 @@ The host scores each worker 0–3, states its independently checked contribution
 
 This version incorporates focused/isolated subagents, explicit effective configuration and bounded learning from upstream/community patterns. It deliberately omits recursive privilege expansion, automatic commits, unrestricted shell workers and worker-authored authoritative memory. [Primary sources and tradeoffs](references/research.md).
 
-The project includes source, templates, 110 offline tests, separate installed-SDK tests, cross-platform installation helpers, a CI matrix, MIT license, contribution/security guidance and deterministic allowlisted ZIP packaging. The CI matrix is supplied, not claimed to have run. [Executed and unexecuted checks](references/validation.md).
+The project includes source, templates, 142 offline tests, separate installed-SDK tests, cross-platform installation helpers, a CI matrix, MIT license, contribution/security guidance and deterministic allowlisted ZIP packaging. The CI matrix is supplied, not claimed to have run. [Executed and unexecuted checks](references/validation.md).
 
 Publish the **contents** of the extracted `pi` directory as the GitHub repository root. On a networked machine with supported Node, generate and review a genuine `package-lock.json`, run the SDK checks, and commit the lock. None is fabricated in this archive. Build a distributable archive with:
 
