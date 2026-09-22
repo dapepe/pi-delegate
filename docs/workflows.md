@@ -2,6 +2,12 @@
 
 These are decision patterns for the host, not automatic pipelines or preassigned model specialties. Choose the smallest pattern that meaningfully reduces uncertainty. Pi's default assignment is one independent `sparring-partner`; the host's concrete question, scope and criteria determine whether it reviews correctness, completeness, security, maintainability, design or planning.
 
+Every invocation starts with a brief naming the goal, assignments, models, access, closing
+criteria and total allowance. For an explicit sequence or bounded loop, use the
+[workflow contract and commands](workflow-contracts.md): they provide Mermaid/ASCII
+diagrams, artifact-bound candidate handoffs, host decisions and shared budget/deadline
+accounting. These commands still execute only one phase at a time under the primary host.
+
 ## One bounded second opinion
 
 Use one read-only worker to challenge a proposed explanation, API design, or bug diagnosis. The host provides relevant source and acceptance criteria, independently checks the returned evidence, and decides whether further work is warranted. Do not delegate a trivial change just because the skill is available.
@@ -18,7 +24,7 @@ The host groups duplicates by root cause, reproduces important claims, and compa
 
 When context is unclear, delegate a small read-only scout task first. Its artifact should identify relevant code, observable behavior, and missing information. The host reads that result and decides which source to inspect and what implementation work to authorize.
 
-Only then create a new plan for candidate work. Carry forward selected verified facts and acceptance criteria, not the scout's full conversation or instructions. The runner has no cross-process resume/compaction/chain command, and the scout cannot grant permissions to another worker.
+Only then prepare the candidate phase. Carry forward selected verified facts and acceptance criteria, not the scout's full conversation or instructions. A workflow may declare both phases up front and use a host-authored packet for verified scout facts. The runner has no cross-process resume/compaction, and the scout cannot grant permissions to another worker.
 
 ## Candidate implementer plus baseline reviewer
 
@@ -62,6 +68,10 @@ After a killed process there is no persistent resume command. The host may const
 ## Spending and stopping
 
 Treat each additional phase as another spending decision. Keep the phases of one task as sibling run directories and aggregate them with `ledger --out PARENT` against the user's total authorization. A single plan's `$5` default is not permission to spend `$5` repeatedly until a worker agrees.
+
+For a declared workflow, use `workflow run` and `workflow status`; the wrapper keeps the
+sibling runs under `runs/` and subtracts earlier request costs/reservations automatically.
+Do not use standalone `run` to bypass that shared allowance.
 
 Stop on sufficient evidence, repeated unproductive attempts, missing permissions, unavailable routes, or exhausted budget. Preserve and report costs for failures, rejected proposals, and inconclusive reviews. A failed worker may still cost money; a clean review may still be useful.
 

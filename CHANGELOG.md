@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.6.0 — 2026-09-22
+
+- Required invocation brief with goal, roles/assignments, exact model choices, access,
+  completion criteria and total allowance; no additional approval pause when authorized.
+- Host-controlled workflow schema 1 wraps existing plans in ordered sequences and bounded
+  loops. Mermaid/ASCII previews share the same phase/loop representation.
+- Candidate handoffs bind producer artifacts to temporary consumer snapshots; the host
+  explicitly reviews each transition. Shared costs, reservations and deadlines include
+  every phase/retry, metadata delay and host review. No automatic code integration.
+- Local workflow status and revision-checked decisions distinguish goal completion,
+  limits, stalled progress and blockers. New strategy labels `sequence`/`bounded-loop`
+  retain task/assignment identity across cycles; learning promotion rules are unchanged.
+- No new dependencies or automatic installation changes. See
+  [workflow migration notes](docs/workflow-contracts.md#migration-notes).
+
 ## 1.5.0 — 2026-09-22
 
 Adds a host-graded feedback loop and project-aware local insights while preserving the

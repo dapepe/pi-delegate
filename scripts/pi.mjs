@@ -20,7 +20,7 @@ import { beginRunInventory, updateRunInventory } from './insights-store.mjs';
 const HOME = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const DEFAULTS = JSON.parse(fs.readFileSync(path.join(HOME, 'defaults.json'), 'utf8'));
 const SDK_VERSION = '0.85.1';
-const SKILL_VERSION = '1.5.0';
+const SKILL_VERSION = '1.6.0';
 const API = 'https://openrouter.ai/api/v1';
 const readJson = filename => JSON.parse(fs.readFileSync(filename, 'utf8'));
 function enrichReportArtifacts(runDir, report) {
@@ -176,6 +176,8 @@ export async function executeJob(input, requestedOut, dependencies = {}) {
   const timers = dependencies.timers || globalThis;
   const plan = validatePlan(input, DEFAULTS);
   const snapshot = captureSnapshot(plan);
+  dependencies.validateSnapshot?.(plan, manifestOf(snapshot));
+  if (dependencies.deadlineMs !== undefined) assert(Number.isFinite(dependencies.deadlineMs), 'Invalid outer workflow deadline');
   const resolve = dependencies.resolve || await makeResolver(plan.policy);
   // Resolve every model and key before any paid inference: no partially-started invalid plans.
   const prepared = [];
@@ -263,6 +265,9 @@ export async function executeJob(input, requestedOut, dependencies = {}) {
     const { agent: spec, model, metadata: resolvedMetadata, key, adapter } = entry;
     // A worker allocation narrows the plan ceiling for this worker only; it can never raise it.
     const policy = workerPolicy(plan.policy, spec.limits);
+    // A workflow deadline includes earlier phases and host review. Each worker wave and
+    // provider request shares it; starting another worker cannot restart the clock.
+    if (dependencies.deadlineMs !== undefined) policy.timeout_seconds = Math.max(0, Math.min(policy.timeout_seconds, (dependencies.deadlineMs - now()) / 1000));
     const metadata = { ...resolvedMetadata, max_output_tokens: Math.min(resolvedMetadata.max_output_tokens, policy.max_output_tokens) };
     const agentOut = path.join(out, spec.id);
     fs.mkdirSync(agentOut, { mode: 0o700 });
@@ -335,6 +340,7 @@ export async function executeJob(input, requestedOut, dependencies = {}) {
       getApiKey: () => key,
       streamFn: (selected, context, options) => {
         assert(!cancelled && !reason, reason || 'Cancelled');
+        if (elapsed() >= policy.timeout_seconds) { setReason('timeout'); throw new Error('Worker or workflow deadline reached'); }
         if (used >= policy.max_turns) { setReason('turn_limit'); throw new Error('Turn limit reached'); }
         if (budgetReached()) { setReason('budget_limit'); throw new Error('Soft budget limit reached'); }
         // Reserve the finishing allowance *inside* the ceilings rather than above them: a worker
@@ -611,6 +617,12 @@ function argsOf(argv) {
   return { command, options };
 }
 async function main() {
+  if (process.argv[2] === 'workflow') {
+    const { workflowMain } = await import('./workflow.mjs');
+    const result = await workflowMain(process.argv.slice(3));
+    console.log(typeof result === 'string' ? result : JSON.stringify(result, null, 2));
+    return;
+  }
   if (process.argv[2] === 'learn') {
     const { learningMain } = await import('./learning.mjs');
     return learningMain(process.argv.slice(3));
@@ -632,7 +644,7 @@ async function main() {
   }
   if (command === 'auth') { await authenticate(); return; }
   if (command === 'help') {
-    console.log(`pi\n  doctor (local setup check; no network)\n  auth (interactive private credential setup)\n  report --out RUN_DIRECTORY [--assessment ASSESSMENT.json]\n  finalize --out RUN_DIRECTORY [--repo ROOT] [--assessment ASSESSMENT.json] [--revise] [--require-complete]\n  models [--config POLICY.json]\n  check --plan PLAN.json\n  run --plan PLAN.json [--out NEW_DIRECTORY_OUTSIDE_REPO]\n  diagnose --out RUN_DIRECTORY (local stop diagnosis; reads 1.2.0+ artifacts)\n  verify --out RUN_DIRECTORY [--repo REPOSITORY]\n  reconcile --out RUN_DIRECTORY\n  ledger --out RUN_DIRECTORY_OR_PARENT_OF_RUNS (sum several phases; local)\n  stats [--repo ROOT] [--out RUNS] [--period 7d|30d|90d|all] [--format json|markdown] [--tui]\n  recommend --repo ROOT [--out RUNS] --plan PLAN.json [--period 7d|30d|90d|all] [--format json|markdown]\n  learn help (local project learning; no paid calls)\n\nrun is paid inference. check/models/stats/recommend only read local state or query model metadata. No command integrates code.`);
+    console.log(`pi\n  doctor (local setup check; no network)\n  auth (interactive private credential setup)\n  report --out RUN_DIRECTORY [--assessment ASSESSMENT.json]\n  finalize --out RUN_DIRECTORY [--repo ROOT] [--assessment ASSESSMENT.json] [--revise] [--require-complete]\n  models [--config POLICY.json]\n  workflow help (briefs, sequences, bounded loops and host decisions)\n  check --plan PLAN.json\n  run --plan PLAN.json [--out NEW_DIRECTORY_OUTSIDE_REPO]\n  diagnose --out RUN_DIRECTORY (local stop diagnosis; reads 1.2.0+ artifacts)\n  verify --out RUN_DIRECTORY [--repo REPOSITORY]\n  reconcile --out RUN_DIRECTORY\n  ledger --out RUN_DIRECTORY_OR_PARENT_OF_RUNS (sum several phases; local)\n  stats [--repo ROOT] [--out RUNS] [--period 7d|30d|90d|all] [--format json|markdown] [--tui]\n  recommend --repo ROOT [--out RUNS] --plan PLAN.json [--period 7d|30d|90d|all] [--format json|markdown]\n  learn help (local project learning; no paid calls)\n\nrun is paid inference. check/models/stats/recommend only read local state or query model metadata. No command integrates code.`);
     return;
   }
   if (command === 'diagnose') {

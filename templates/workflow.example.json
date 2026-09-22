@@ -1,0 +1,159 @@
+{
+  "schema_version": 1,
+  "task_id": "synthetic-cache-fix",
+  "objective": "SYNTHETIC EXAMPLE: fix cache invalidation and verify the candidate; replace with the real goal.",
+  "orchestrator": "codex",
+  "repo_root": "/absolute/path/to/your/repository",
+  "criteria": [
+    {
+      "id": "regressions",
+      "requirement": "Host runs the relevant regression checks and verifies they pass."
+    },
+    {
+      "id": "blockers",
+      "requirement": "Host resolves all blocking review findings against the exact final candidate."
+    }
+  ],
+  "limits": {
+    "budget_usd": 5,
+    "timeout_seconds": 1800
+  },
+  "loop": {
+    "max_iterations": 3,
+    "repeat_from": {
+      "step": "implement",
+      "agent": "candidate"
+    }
+  },
+  "steps": [
+    {
+      "id": "implement",
+      "title": "Implement or revise",
+      "input": "baseline",
+      "plan": {
+        "orchestrator": "codex",
+        "repo_root": "/absolute/path/to/your/repository",
+        "objective": "Implement or revise for the synthetic cache example; replace with the actual assignment.",
+        "context": "SYNTHETIC TEMPLATE, not live evidence. Preserve the public API and do not add dependencies. The host runs tests and decides integration. Keep the submission under 1,200 words and at most eight supported findings; this is a cap, not a quota. State complete, partial or blocked honestly.",
+        "policy_sources": [
+          "AGENTS.md"
+        ],
+        "policy": {
+          "max_agents": 1,
+          "max_parallel": 1,
+          "session_budget_usd": 5,
+          "per_agent_budget_usd": 2
+        },
+        "read_files": [
+          "src/cache.ts",
+          "tests/cache.test.ts"
+        ],
+        "agents": [
+          {
+            "id": "candidate",
+            "role": "sparring-partner",
+            "provider": "openrouter",
+            "model": "deepseek/deepseek-v4.1-flash",
+            "mode": "write",
+            "effort": "xhigh",
+            "write_files": [
+              "src/cache.ts",
+              "tests/cache.test.ts"
+            ],
+            "selection_reason": "Illustrative approved-pool choice; replace with the actual user preference or supported task-specific reason, then check availability.",
+            "task": "Implement the smallest cache invalidation fix and regression test in the named candidate files. Prefer replace_text. On later cycles address only host-validated feedback. Do not claim tests ran."
+          }
+        ],
+        "evaluation": {
+          "schema_version": 1,
+          "task_id": "synthetic-cache-fix",
+          "task_type": "bugfix",
+          "scope": "src/cache.ts",
+          "complexity": "bounded",
+          "strategy": "bounded-loop",
+          "strategy_version": "v1",
+          "focus": [
+            "correctness"
+          ],
+          "workers": [
+            {
+              "agent_id": "candidate",
+              "assignment_id": "implement-assignment",
+              "attempt_index": 1,
+              "criteria": [
+                {
+                  "id": "assignment",
+                  "requirement": "Provide the smallest complete candidate fix and regression test, with source evidence and limitations."
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "review",
+      "title": "Review the exact candidate",
+      "input": {
+        "step": "implement",
+        "agent": "candidate"
+      },
+      "plan": {
+        "orchestrator": "codex",
+        "repo_root": "/absolute/path/to/your/repository",
+        "objective": "Review the exact candidate for the synthetic cache example; replace with the actual assignment.",
+        "context": "SYNTHETIC TEMPLATE, not live evidence. Preserve the public API and do not add dependencies. The host runs tests and decides integration. Keep the submission under 1,200 words and at most eight supported findings; this is a cap, not a quota. State complete, partial or blocked honestly.",
+        "policy_sources": [
+          "AGENTS.md"
+        ],
+        "policy": {
+          "max_agents": 1,
+          "max_parallel": 1,
+          "session_budget_usd": 5,
+          "per_agent_budget_usd": 2
+        },
+        "read_files": [
+          "src/cache.ts",
+          "tests/cache.test.ts"
+        ],
+        "agents": [
+          {
+            "id": "reviewer",
+            "role": "sparring-partner",
+            "provider": "openrouter",
+            "model": "google/gemini-3.8-flash",
+            "mode": "read",
+            "effort": "xhigh",
+            "selection_reason": "Illustrative approved-pool choice; replace with the actual user preference or supported task-specific reason, then check availability.",
+            "task": "Review the supplied candidate snapshot for cache invalidation correctness and edge cases. Read each file once then submit. Give supported findings or explain what holds up; do not invent findings."
+          }
+        ],
+        "evaluation": {
+          "schema_version": 1,
+          "task_id": "synthetic-cache-fix",
+          "task_type": "bugfix",
+          "scope": "src/cache.ts",
+          "complexity": "bounded",
+          "strategy": "bounded-loop",
+          "strategy_version": "v1",
+          "focus": [
+            "correctness"
+          ],
+          "workers": [
+            {
+              "agent_id": "reviewer",
+              "assignment_id": "review-assignment",
+              "attempt_index": 1,
+              "criteria": [
+                {
+                  "id": "assignment",
+                  "requirement": "Inspect the exact supplied candidate for correctness and edge cases, citing evidence and unresolved uncertainty."
+                }
+              ]
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

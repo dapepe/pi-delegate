@@ -4,6 +4,12 @@
 
 A standalone skill for bounded multi-model coding delegation through Pi. The current host selects models, context, thinking effort and permissions; independently validates the results; and alone decides what to integrate. A default independent `sparring-partner` can review bugs, gaps, security, cleanup, implementation/design alternatives, plans or task definitions against a concrete assignment. Workers can review *and* implement: a `mode: write` worker edits an isolated candidate overlay and hands back a patch, never the real checkout. Optional project-local learning turns validated outcomes into compact, reviewed routing preferences in `AGENTS.md`.
 
+Each invocation begins with a delegation brief showing assignments, model choices,
+permissions and completion criteria. Describe a sequence or a bounded loop in your
+request: the host shows its Mermaid/ASCII diagram, coordinates each phase, and verifies
+the closing condition within one shared budget and deadline. See
+[workflow contracts and examples](docs/workflow-contracts.md).
+
 The repository root is the complete skill. Its name and install directory are **pi** on both hosts. This is an independent MIT-licensed project, not an official OpenAI, Anthropic, Pi or OpenRouter product.
 
 ## Why I built this
@@ -145,6 +151,7 @@ Run from the skill directory or use an absolute runner path. Common commands:
 ```sh
 node scripts/pi.mjs check --plan /private/plan.json
 node scripts/pi.mjs run --plan /private/plan.json
+node scripts/pi.mjs workflow help
 node scripts/pi.mjs reconcile --out /private/run
 node scripts/pi.mjs verify --out /private/run
 node scripts/pi.mjs report --out /private/run --assessment /private/run/assessment.json
@@ -163,6 +170,13 @@ node scripts/pi.mjs recommend --repo /absolute/project/root --period 90d --forma
 `check` and `models` use provider metadata, not inference; `doctor`, `verify`, `report` and learning are local. `run` performs **paid inference**. Reconciliation requests billing metadata. The optional `npm run smoke -- --allow-paid` requires explicit approval and uses a public synthetic fixture, not a user's source.
 
 Run folders are outside the task repository, by default under `~/.cache/pi/<run-id>`. They contain normalized plan/snapshot metadata, usage and report files, per-worker structured results/events, candidate patches/files, and the host's optional assessment. No full reasoning transcript is retained — a bounded excerpt of visible assistant text is kept for diagnosis, never thinking blocks, signatures or raw tool arguments — but source snippets and candidate content can still be private. Do not publish run folders. [Artifact/workflow details](docs/workflows.md).
+
+For sequences/loops, `workflow init` creates a new private directory, `workflow preview`
+renders the brief/diagram, and `workflow check` resolves model metadata without inference.
+`workflow run` executes one phase and awaits a host `workflow decide`; `workflow status`
+totals all attempts and reports remaining limits. Candidate handoffs stay outside the
+checkout. Use the [synthetic template](templates/workflow.example.json) after replacing its
+paths and assignments. Existing standalone plans and commands remain compatible.
 
 Reports separate provider-reported charges, unresolved estimates and unknown requests; unknown is never zero. OpenRouter reconciliation uses generation `total_cost` when available and does not add an estimate on top of a reconciled charge. Host costs are excluded and the report names the actual host. Failed/rejected attempts remain in the ledger. [OpenRouter generation metadata](https://openrouter.ai/docs/api/api-reference/generations/get-request-%26-usage-metadata-for-a-generation).
 

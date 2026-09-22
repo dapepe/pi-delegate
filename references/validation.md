@@ -1,3 +1,28 @@
+# Validation record — pi 1.6.0
+
+Executed locally on September 22, 2026, on macOS with Node 22.23.1:
+
+- Release preparation used `npm ci --ignore-scripts` with the tracked lockfile;
+  `npm audit` reported zero vulnerabilities. Dependency versions are unchanged.
+- `npm test`: 194 tests passed, zero failures. New synthetic coverage exercises ordered
+  candidate handoffs, different phase models, parallel baseline isolation, loop closure,
+  no-progress/iteration stops, shared costs/reservations/deadlines, narrowed retries,
+  stale source/artifact rejection, host/revision checks, interrupted-run reporting,
+  Mermaid/ASCII output and template/CLI validation.
+- `npm run check:sdk`: installed exports, version pins, effort mapping, construction and
+  diff generation passed without provider requests.
+- `npm run test:sdk`: six installed-SDK tests passed using synthetic transport.
+- Skill quick validator and `git diff --check`: passed.
+- Release allowlist inspection included the workflow module, synthetic tests, template
+  and guide, with no private workflow state, run, handoff or dependency paths.
+
+No paid inference, live provider workflow, actual harness diagram rendering, CI run,
+or Windows/Linux execution was performed during feature validation. Dependencies and
+system settings were unchanged. Host validation records remain attestations;
+these tests do not prove that a real host makes correct qualitative decisions.
+
+---
+
 # Validation record — pi 1.5.0
 
 ## Executed locally on September 22, 2026 (macOS, Node 22.23.1)

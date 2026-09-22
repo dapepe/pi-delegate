@@ -25,7 +25,7 @@ export const FOCUS_TAGS = Object.freeze([
 
 export const STRATEGIES = Object.freeze([
   'single-review', 'parallel-independent', 'scout-then-candidate',
-  'candidate-then-review', 'design-challenge', 'edge-case-review'
+  'candidate-then-review', 'design-challenge', 'edge-case-review', 'sequence', 'bounded-loop'
 ]);
 
 const MAX_FOCUS = 8;

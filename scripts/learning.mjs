@@ -20,7 +20,9 @@ export const STRATEGIES = Object.freeze({
   'scout-then-candidate': 'a scoped scout followed by a host-prepared candidate task',
   'candidate-then-review': 'a candidate followed by a separate host-scoped read-only review',
   'design-challenge': 'a focused challenge to a proposed design',
-  'edge-case-review': 'a targeted edge-case and test review'
+  'edge-case-review': 'a targeted edge-case and test review',
+  'sequence': 'ordered phases with host-reviewed handoffs',
+  'bounded-loop': 'a bounded sequence repeated under host-verified closing criteria'
 });
 const ROLES = ['scout', 'candidate', 'correctness-review', 'test-review', 'design-challenger', 'sparring-partner'];
 const V2_RESULTS = new Set(['passed', 'failed', 'inconclusive', 'not_run']);

@@ -1,5 +1,9 @@
 # Configuration
 
+Sequences and loops use a separate [workflow schema](workflow-contracts.md), wrapping
+ordinary plans without changing their shape. It adds shared limits, closing criteria,
+ordered inputs and host decisions; those keys do not belong in the inference `policy`.
+
 ## Precedence and AGENTS.md
 
 The host resolves the current user request and applicable project instructions, then uses bundled defaults where nothing more specific is authorized. Project Markdown is not executable configuration. `templates/AGENTS.example.md` documents a convention; the host copies the resolved values into the plan's `policy` and lists the instruction sources in `policy_sources`.
@@ -89,7 +93,7 @@ Each worker can specify a `read_files` subset; omitted means all enumerated plan
 
 The surrounding `objective`, `context`, `read_files`, and worker `task` carry the question or decision, source scope, constraints, expected contribution, success evidence and uncertainty. `task_id` is a stable lowercase identifier for the real task and must stay the same across retries and phases. `assignment_id` identifies an assignment; `attempt_index` starts at one and increments for a retry. Every plan agent must have exactly one evaluation worker entry. Each criterion has a portable `id` and a concrete `requirement`, with at most eight criteria per worker. Assessment criteria must cover the preregistered IDs exactly; do not add a new criterion during grading.
 
-The built-in focus labels are `correctness`, `completeness`, `security`, `maintainability`, `design`, and `planning`. A plan may add bounded lowercase custom tags. Focus labels are filters for review; they do not require disagreement or a minimum finding count. Suggested task types include bugfix, feature, refactor, security, performance, testing, documentation, architecture, design, planning, investigation, migration, release and review; a bounded lowercase custom task type is also allowed. The default strategy is `single-review`; use the other fixed strategy labels only when the host actually uses that workflow.
+The built-in focus labels are `correctness`, `completeness`, `security`, `maintainability`, `design`, and `planning`. A plan may add bounded lowercase custom tags. Focus labels are filters for review; they do not require disagreement or a minimum finding count. Suggested task types include bugfix, feature, refactor, security, performance, testing, documentation, architecture, design, planning, investigation, migration, release and review; a bounded lowercase custom task type is also allowed. The default strategy is `single-review`; use the other fixed strategy labels only when the host actually uses that workflow. `sequence` and `bounded-loop` describe the new host-controlled workflows; they preserve the same task ID across every phase, retry and cycle.
 
 The runner validates this block when present and includes only the criteria for the assigned worker in its prompt. It stores the complete host-authored block in the report for provenance. A malformed evaluation block fails closed; deleting it to make a plan pass changes the recorded contract and should be a deliberate host decision.
 

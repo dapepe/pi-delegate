@@ -6,6 +6,7 @@ These are **schema examples, not runnable tasks or live result evidence**. Repla
 - [implementation.plan.json](implementation.plan.json): a Claude Code-hosted candidate implementer with a larger allocation, plus an independent read-only reviewer held below that ceiling by its own `limits`.
 - [claude-code.plan.json](claude-code.plan.json): equivalent Claude Code host metadata.
 - [plan template](../templates/plan.example.json): candidate plus independent baseline reviewer.
+- [workflow template](../templates/workflow.example.json): a synthetic implement → candidate review loop, with a shared budget, three-cycle ceiling and host-verified closing criteria. Remove `loop` and use strategy `sequence` for one ordered pass. See [workflow commands](../docs/workflow-contracts.md).
 - [assessment template](../templates/assessment.example.json): normal host judgments.
 - [learning assessment template](../templates/learning-assessment.example.json): conservative, initially unvalidated learning fields; set the actual host and actual evidence.
 - [legacy assessment template](../templates/assessment.legacy.example.json): schema-1 assessment retained to demonstrate additive reading of older runs.

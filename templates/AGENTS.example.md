@@ -2,6 +2,16 @@
 
 The current primary host (Codex or Claude Code) is the sole orchestrator and integration decision maker. It may delegate bounded work to Pi when the expected value justifies the cost and the user/workspace policy permits the required external data transfer. Read-only is the default. Candidate-write permission requires an explicit file list; the main checkout is never writable by a Pi worker. The host decides which findings/edits to accept, validates them, and reports quality, usefulness and cost.
 
+Before paid delegation, show a brief with the goal, assignments/roles, exact models,
+effort, access scope, closing condition and total allowance. Continue within existing
+authorization unless I request approval or plan-only. Show sequences and bounded loops
+as Mermaid when rendering support is established, otherwise ASCII. For loops, state a
+finite cycle limit (normally three), a shared elapsed-time limit and the existing total
+spending allowance; use the workflow wrapper so phases cannot reset those limits.
+The host verifies each transition and the goal, reports stalled/blocked/limited outcomes
+honestly, and carries only validated feedback between models. This prose is not a
+permission to expand file access, models or spending.
+
 Use the following preferences when compiling the `pi` run plan. The JSON is a policy override for this skill, not native Pi or native host configuration. The host must copy the resolved settings into the plan's `policy`; the helper does not parse this Markdown.
 
 ```json
