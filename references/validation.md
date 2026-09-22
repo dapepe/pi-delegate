@@ -1,4 +1,4 @@
-# Validation record — pi 1.6.0
+# Validation record — pi 1.6.1 (workflow enhancement)
 
 Executed locally on September 22, 2026, on macOS with Node 22.23.1:
 

@@ -20,7 +20,7 @@ import { beginRunInventory, updateRunInventory } from './insights-store.mjs';
 const HOME = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const DEFAULTS = JSON.parse(fs.readFileSync(path.join(HOME, 'defaults.json'), 'utf8'));
 const SDK_VERSION = '0.85.1';
-const SKILL_VERSION = '1.6.0';
+const SKILL_VERSION = '1.6.1';
 const API = 'https://openrouter.ai/api/v1';
 const readJson = filename => JSON.parse(fs.readFileSync(filename, 'utf8'));
 function enrichReportArtifacts(runDir, report) {

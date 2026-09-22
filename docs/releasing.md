@@ -66,8 +66,8 @@ This creates `dist/pi.zip` and `dist/SHA256SUMS`. Given identical input bytes, t
 After a reviewed release commit:
 
 ```sh
-git tag v1.6.0
-git push origin v1.6.0
+git tag v1.6.1
+git push origin v1.6.1
 ```
 
 Choose a new tag rather than replacing an already published one. GitHub's automatic source download and the curated `pi.zip` are separate artifacts; the latter always has the installation root `pi/`.

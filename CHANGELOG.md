@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.6.1 — 2026-09-22
+
+- Use native filesystem paths for workflow CLI fixtures on Windows. The 1.6.0 feature
+  commit and tag are retained; the published workflow release is 1.6.1.
+
 ## 1.6.0 — 2026-09-22
 
 - Required invocation brief with goal, roles/assignments, exact model choices, access,

@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { validateWorkflow, workflowBrief, workflowDiagram, initWorkflow, runWorkflow, decideWorkflow, workflowStatus, workflowMain, checkWorkflow } from '../scripts/workflow.mjs';
 import { openRouterModel } from '../scripts/lib.mjs';
@@ -177,9 +178,9 @@ test('CLI previews are local, fail closed on unsupported flags, and preserve exi
   assert.match(await workflowMain(['preview', '--out', f.out]), /```text/);
   await assert.rejects(workflowMain(['preview', '--out', f.out, '--mermaid-supported', 'maybe']));
   await assert.rejects(workflowMain(['run', '--out', f.out, '--shell', 'bad']));
-  const cli = new URL('../scripts/pi.mjs', import.meta.url);
-  const help = spawnSync(process.execPath, [cli.pathname, 'workflow', 'help'], { encoding: 'utf8' }); assert.equal(help.status, 0); assert.match(help.stdout, /exactly one phase/);
-  const legacy = spawnSync(process.execPath, [cli.pathname, 'help'], { encoding: 'utf8' }); assert.equal(legacy.status, 0); assert.match(legacy.stdout, /run --plan/);
+  const cli = fileURLToPath(new URL('../scripts/pi.mjs', import.meta.url));
+  const help = spawnSync(process.execPath, [cli, 'workflow', 'help'], { encoding: 'utf8' }); assert.equal(help.status, 0, help.stderr); assert.match(help.stdout, /exactly one phase/);
+  const legacy = spawnSync(process.execPath, [cli, 'help'], { encoding: 'utf8' }); assert.equal(legacy.status, 0, legacy.stderr); assert.match(legacy.stdout, /run --plan/);
 });
 
 test('all-model metadata preflight reports effective effort and fails if a later model is missing', async t => {
