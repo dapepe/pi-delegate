@@ -1,14 +1,16 @@
 # Host-controlled workflows
 
-These are decision patterns for the host, not automatic pipelines or preassigned model specialties. Choose the smallest pattern that meaningfully reduces uncertainty.
+These are decision patterns for the host, not automatic pipelines or preassigned model specialties. Choose the smallest pattern that meaningfully reduces uncertainty. Pi's default assignment is one independent `sparring-partner`; the host's concrete question, scope and criteria determine whether it reviews correctness, completeness, security, maintainability, design or planning.
 
 ## One bounded second opinion
 
 Use one read-only worker to challenge a proposed explanation, API design, or bug diagnosis. The host provides relevant source and acceptance criteria, independently checks the returned evidence, and decides whether further work is warranted. Do not delegate a trivial change just because the skill is available.
 
+Before execution, make the assignment explicit: name the question or decision, source/context/constraints, expected contribution, success evidence and uncertainty. Add optional standard focus labels or custom tags when they help later filtering. A worker may confirm that an approach holds up; do not force dissent or a finding quota.
+
 ## Independent two-model review
 
-Select two authorized models, preferably from different families, and distinct roles such as correctness and edge-case/test coverage. Give both the same factual baseline but not each other's conclusions. Their recommendations are hypotheses, not votes.
+Select two authorized models, preferably from different families, and give both independent `sparring-partner` assignments with distinct questions or focus tags when that adds coverage. Give both the same factual baseline but not each other's conclusions. Their recommendations are hypotheses, not votes.
 
 The host groups duplicates by root cause, reproduces important claims, and compares contradictory evidence. A third call is justified only by a specific unresolved question or materially missing perspective. Stop when a decision is adequately supported; no open-ended debate loop.
 
@@ -32,11 +34,13 @@ Prefer independent files or logically separable changes. Even though each worker
 
 ## Evidence-backed project learning
 
-After independent validation, the current primary host may record an assessment when learning is explicitly enabled. Same-task retries/phases retain one task identifier; roles, team, host/model/version, effort, permission, runtime allocation and task scope remain part of the profile. Raw local history is ignored, not uploaded. Only eligible host-reviewed advisory preferences may enter the marked `AGENTS.md` section.
+After independent validation, the current primary host may record an assessment when learning is explicitly enabled. Same-task retries/phases retain one task identifier; roles, team, host/model/version, effort, permission, runtime allocation and task scope remain part of the profile. Record quality (0–3 or unknown) separately from usefulness (0–3): quality judges the original assignment, while usefulness judges its incremental value. Raw local history is ignored, not uploaded. Only eligible host-reviewed advisory preferences may enter the marked `AGENTS.md` section.
 
-`record`/`summary`/`propose` do not modify instructions. A separately reviewed `apply` does; `propose` mode also needs user approval, while `auto` is explicit local opt-in. No training, reflection-model call, autonomous recursion or Git commit occurs. See [learning](learning.md) for thresholds, late regression corrections and limits.
+`record`/`summary`/`propose` do not modify instructions. A separately reviewed `apply` does; `propose` mode also needs user approval, while `auto` is explicit local opt-in. `finalize` is a receipt-producing local step that can save an assessment and report whether recording, review or promotion remains; it never applies instructions, runs tests or calls a model. No training, reflection-model call, autonomous recursion or Git commit occurs. See [learning](learning.md) for thresholds, late regression corrections and limits.
 
 A run against a different temporary candidate-review repository is not evidence of source provenance for the real repository. Keep its artifacts/costs separate; the host may cite the review as validation of an original-project candidate but must not relabel its source or count it as a new independent task. Per-profile costs are not complete multi-phase workflow costs.
+
+Use `stats` for the local project-aware view of all recorded attempts, including failed, rejected and unassessed work. Its JSON, Markdown and dependency-free terminal view consume the same aggregation. Use `recommend --plan` only as an explainable aid inside the existing model/privacy/budget policy; sparse or mismatched evidence should leave the normal authorized defaults in place. See [insights](insights.md).
 
 ## Retrying a failed worker
 
@@ -44,7 +48,7 @@ Read the worker's `failure_class` before deciding anything. Three failures obser
 
 - **A slow route timed out after reading everything.** The per-request timing shows minutes per turn; the packet was not the problem. Retry once with the same worker id and task, fewer files, and either a longer `timeout_seconds` or another authorized family. The grace window makes the worker submit what it has before the cut-off, so a second timeout with no output means the route, not the task.
 - **Upstream rate limit (429).** Wait, or move to another authorized model. Record it as a provider failure in the assessment; it is not evidence about the model's quality either way.
-- **The whole output budget went to reasoning.** The model never called `submit_result`. Add an explicit cap to the task packet (word count and finding count), keep the packet small, and prefer a model that submits early. Raising `max_output_tokens` rarely helps.
+- **The whole output budget went to reasoning.** The model never called `submit_result`. Add an explicit output cap to the task packet (word count and finding count), make clear that the finding count is not a quota, keep the packet small, and prefer a model that submits early. Raising `max_output_tokens` rarely helps.
 - **It stopped without submitting, or submitted `partial`.** Run [`diagnose`](troubleshooting.md) first. Bounded repair has already spent one follow-up; a second attempt on the same packet is unlikely to differ. Review the candidate checkpoint and the unvalidated public output, then repacket only the remaining work as a new phase with the original task ID.
 
 One narrowed retry per failure kind, changing exactly one thing, is the limit. Keep every phase's run directory and total them with `ledger`; a retry costs money whether or not it produces anything.

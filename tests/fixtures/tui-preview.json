@@ -1,0 +1,79 @@
+{
+  "_fixture": "synthetic-only; no live usage",
+  "schema_version": 1,
+  "generated_at": "2026-09-22T12:00:00.000Z",
+  "period": {
+    "name": "30d",
+    "start": "2026-08-23T12:00:00.000Z",
+    "end": "2026-09-22T12:00:00.000Z"
+  },
+  "selection": {
+    "projects": [
+      { "project_id": "alpha-id", "project_name": "Alpha", "path": "/tmp/alpha" },
+      { "project_id": "beta-id", "project_name": "Beta", "path": "/tmp/beta" }
+    ]
+  },
+  "summary": {
+    "latest_assignments": 4,
+    "distinct_tasks": 3,
+    "latest_completed": 2,
+    "latest_failed": 1,
+    "latest_incomplete": 1,
+    "stale_checkpoints": 1,
+    "assignment_metadata_missing": 1,
+    "assessed_coverage": { "usefulness": 2 },
+    "quality": { "mean": 2, "assessed": 2, "denominator": 3 },
+    "usefulness": { "mean": 2.5, "assessed": 2, "denominator": 3 }
+  },
+  "costs": {
+    "known_usd": 0.1234,
+    "estimated_usd": 0.02,
+    "unknown_charge_requests": 1,
+    "request_count": 5,
+    "token_totals": { "input": 100, "input_known": 5, "output": 50, "output_known": 4, "reasoning": 10, "reasoning_known": 2, "cache_read": 20, "cache_read_known": 3, "cache_write": 5, "cache_write_known": 1, "total": 165, "total_known": 5 }
+  },
+  "models": [
+    {
+      "profile_key": "m1",
+      "label": "openrouter/model-v1 · xhigh · codex",
+      "role": "sparring-partner",
+      "distinct_tasks": 2,
+      "latest_assignments": 2,
+      "total_attempts": 3,
+      "retry_attempts": 1,
+      "quality": { "mean": 2, "assessed": 2, "denominator": 2 },
+      "usefulness": { "mean": 2.5, "assessed": 2, "denominator": 2 },
+      "model": { "provider": "openrouter", "resolved_model": "model-v1", "model_identity": "model-v1", "requested_model": "model-v1", "host": "codex", "effective_effort": "xhigh", "mode": "read" },
+      "costs": { "known_usd": 0.1234, "estimated_usd": 0.02, "unknown_charge_requests": 1 },
+      "raw_evidence_available": false
+    }
+  ],
+  "focus_areas": [
+    { "tag": "security", "assignments": 2, "distinct_tasks": 2, "quality": { "mean": 2, "assessed": 1, "denominator": 2 }, "usefulness": { "mean": 2, "assessed": 1, "denominator": 2 }, "raw_evidence_available": true }
+  ],
+  "tasks": [
+    { "task_id": "task-1", "task_label": "Review auth", "project_name": "Alpha", "repo_path": "/tmp/alpha", "attempts": [{ "at": "2026-09-20", "status": "completed", "costs": { "known_usd": 0.04, "estimated_usd": 0.01, "unknown_charge_requests": 1 } }], "latest": { "at": "2026-09-20", "status": "completed", "model": { "resolved_model": "model-v1", "provider": "openrouter", "effective_effort": "xhigh" }, "quality_0_to_3": 2, "usefulness_0_to_3": 3 } }
+  ],
+  "learning": {
+    "projects": [
+      { "project_id": "alpha-id", "project_name": "Alpha", "mode": "propose", "status": "finalized", "next_action": "Review proposal", "initialized": true, "assessed_coverage": { "total": 3 } },
+      { "project_id": "beta-id", "project_name": "Beta", "mode": "off", "status": "uninitialized", "next_action": "Run learn init", "initialized": false, "assessed_coverage": { "total": 0 } }
+    ]
+  },
+  "project_views": [
+    {
+      "selection": { "projects": [{ "project_id": "alpha-id", "project_name": "Alpha", "path": "/tmp/alpha" }] },
+      "summary": { "latest_assignments": 2, "distinct_tasks": 2, "latest_completed": 2, "latest_failed": 0, "latest_incomplete": 0, "stale_checkpoints": 0, "quality": { "mean": 2, "assessed": 2, "denominator": 2 }, "usefulness": { "mean": 2.5, "assessed": 2, "denominator": 2 } },
+      "costs": { "known_usd": 0.08, "estimated_usd": 0, "unknown_charge_requests": 0, "request_count": 2, "token_totals": {} },
+      "models": [], "focus_areas": [], "tasks": [],
+      "learning": { "projects": [{ "project_id": "alpha-id", "project_name": "Alpha", "mode": "propose", "status": "finalized", "next_action": "Review proposal", "initialized": true, "assessed_coverage": { "total": 3 } }] }
+    },
+    {
+      "selection": { "projects": [{ "project_id": "beta-id", "project_name": "Beta", "path": "/tmp/beta" }] },
+      "summary": { "latest_assignments": 1, "distinct_tasks": 1, "latest_completed": 0, "latest_failed": 1, "latest_incomplete": 0, "stale_checkpoints": 0, "quality": { "mean": null, "assessed": 0, "denominator": 1 }, "usefulness": { "mean": null, "assessed": 0, "denominator": 1 } },
+      "costs": { "known_usd": 0.0434, "estimated_usd": 0.02, "unknown_charge_requests": 1, "request_count": 3, "token_totals": {} },
+      "models": [], "focus_areas": [], "tasks": [],
+      "learning": { "projects": [{ "project_id": "beta-id", "project_name": "Beta", "mode": "off", "status": "uninitialized", "next_action": "Run learn init", "initialized": false, "assessed_coverage": { "total": 0 } }] }
+    }
+  ]
+}

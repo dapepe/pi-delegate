@@ -23,7 +23,7 @@
   "agents": [
     {
       "id": "review",
-      "role": "independent adversarial reviewer",
+      "role": "sparring-partner",
       "model": "google/gemini-3.8-flash",
       "mode": "read",
       "write_files": [],

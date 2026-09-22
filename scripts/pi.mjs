@@ -11,16 +11,33 @@ import {
   manifestOf, verifySnapshot, createCapabilities, costSummary, budgetBasis, reserveEstimate,
   authorizedIdentities, classifyStop
 } from './lib.mjs';
+import { evaluationCriteriaPrompt, computeArtifactIdentity, evaluationsMatch, readArtifactIdentity } from './evaluation.mjs';
 import { keyFor, scrub, doctor, authenticate, nodeSupported } from './environment.mjs';
 import { markdownReport, validateAssessment, aggregateLedger } from './report.mjs';
 import { runtimeLimits, finalizationReserve, shouldFinalize, publicText, isExplicitRefusal, explainStop, diagnoseRun } from './runtime.mjs';
+import { beginRunInventory, updateRunInventory } from './insights-store.mjs';
 
 const HOME = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const DEFAULTS = JSON.parse(fs.readFileSync(path.join(HOME, 'defaults.json'), 'utf8'));
 const SDK_VERSION = '0.85.1';
-const SKILL_VERSION = '1.4.0';
+const SKILL_VERSION = '1.5.0';
 const API = 'https://openrouter.ai/api/v1';
 const readJson = filename => JSON.parse(fs.readFileSync(filename, 'utf8'));
+function enrichReportArtifacts(runDir, report) {
+  const root = path.resolve(runDir);
+  const planFile = path.join(root, 'plan.json');
+  const snapshotFile = path.join(root, 'snapshot.json');
+  const plan = fs.existsSync(planFile) ? readJson(planFile) : null;
+  const snapshot = fs.existsSync(snapshotFile) ? readJson(snapshotFile) : null;
+  if (plan) assert(evaluationsMatch(report.evaluation, plan.evaluation), 'Saved report evaluation differs from the preregistered plan evaluation');
+  for (const agent of report.agents || []) {
+    assert(typeof agent.id === 'string' && /^[a-z][a-z0-9._-]{0,63}$/.test(agent.id), 'Report worker ID is not a safe artifact directory name');
+    delete agent.artifact_identity;
+    const resultFile = path.join(root, agent.id, 'result.json');
+    if (fs.existsSync(resultFile)) agent.artifact_identity = readArtifactIdentity(root, agent.id, { plan, snapshot });
+  }
+  return report;
+}
 function writeAtomic(filename, contents) {
   // Checkpoints rewrite the same paths repeatedly, so an exclusive create-and-rename is used
   // instead of `wx` on the destination. Each file lands atomically; a set of files does not.
@@ -129,7 +146,7 @@ ${plan.context || '(none)'}
 }
 const requestSeconds = record => record.started_at && record.finished_at
   ? Number(((new Date(record.finished_at) - new Date(record.started_at)) / 1000).toFixed(1)) : null;
-function saveCandidate(out, result, capabilities, createPatch) {
+function saveCandidate(out, result, capabilities, createPatch, sourceSnapshot = null) {
   let patch = '';
   const changes = capabilities.changes();
   const priorChanges = result.changes || [];
@@ -147,6 +164,10 @@ function saveCandidate(out, result, capabilities, createPatch) {
   for (const previous of priorChanges) if (!result.changes.some(c => c.file === previous.file && c.action !== 'delete')) {
     fs.rmSync(path.join(out, 'candidate', ...previous.file.split('/')), { force: true });
   }
+  const identityManifest = changes.map(({ file, before, after }) => after === null
+    ? { path: file, sha256: before === null ? sha256('') : sha256(before), bytes: before === null ? 0 : Buffer.byteLength(before), deleted: true }
+    : { path: file, content: after });
+  result.artifact_identity = computeArtifactIdentity({ submission: result.submission, manifest: identityManifest, snapshot: sourceSnapshot });
   writeAtomic(path.join(out, 'candidate.patch'), patch);
 }
 export async function executeJob(input, requestedOut, dependencies = {}) {
@@ -182,6 +203,7 @@ export async function executeJob(input, requestedOut, dependencies = {}) {
     orchestrator: plan.orchestrator, orchestrator_model: plan.orchestrator_model ?? null, orchestrator_version: plan.orchestrator_version ?? null, skill_version: SKILL_VERSION,
     sdk_version_target: SDK_VERSION, mode: dependencies.Agent ? (dependencies.runtimeLabel || 'offline_test_double') : 'pi_sdk',
     objective: plan.objective, source_repo: plan.repo_root, agents: [], costs: costSummary([]),
+    evaluation: plan.evaluation ?? null,
     integration_decisions: null, usefulness_assessment: null,
     notes: ['Candidates only. Nothing has been integrated.', `Tests must be executed and findings judged by ${hostLabel(plan.orchestrator)}.`, 'No full transcripts or reasoning traces are persisted.']
   };
@@ -189,14 +211,44 @@ export async function executeJob(input, requestedOut, dependencies = {}) {
   const progress = value => { if (dependencies.onProgress) dependencies.onProgress(value); };
   let cancelled = false;
   const active = new Set();
-  const persist = () => {
+  let inventoryActive = false;
+  let inventoryLifecycle = 'running';
+  const syncInventory = () => {
+    if (!inventoryActive) return false;
+    try {
+      const inventory = updateRunInventory(plan.repo_root, { report, plan, usage: { requests, costs: report.costs }, lifecycle: inventoryLifecycle });
+      if (inventory.warning) {
+        (report.inventory_warnings ||= []).push(inventory.warning);
+        return true;
+      }
+    } catch (e) {
+      (report.inventory_warnings ||= []).push(`Run inventory warning: ${String(e.message).slice(0, 500)}`);
+      return true;
+    }
+    return false;
+  };
+  const persist = ({ inventory = false } = {}) => {
     report.updated_at = new Date(now()).toISOString();
     report.costs = costSummary(requests);
     writeJson(path.join(out, 'usage.json'), { schema_version: 1, requests, costs: report.costs });
     writeJson(path.join(out, 'report.json'), report);
+    // Usage/report facts land first.  The compact inventory then gets a
+    // request-boundary checkpoint; a warning is written back to report.json
+    // without turning a paid result into an orchestration failure.
+    if (inventory && syncInventory()) writeJson(path.join(out, 'report.json'), report);
   };
   persist();
-  const cancel = signal => { cancelled = true; if (signal) report.cancellation_signal = signal; for (const a of active) a.abort(); persist(); };
+  // A project opted into learning gets a compact lifecycle row before the
+  // first provider request. Inventory errors are diagnostics only: they must
+  // never erase a paid result or turn a successful run into an orchestration
+  // failure.
+  try {
+    const inventory = beginRunInventory(plan.repo_root, { report, plan, usage: { requests, costs: report.costs } });
+    inventoryActive = inventory.recorded === true;
+    if (inventory.warning) (report.inventory_warnings ||= []).push(inventory.warning);
+  } catch (e) { (report.inventory_warnings ||= []).push(`Run inventory warning: ${String(e.message).slice(0, 500)}`); }
+  persist({ inventory: true });
+  const cancel = signal => { cancelled = true; if (signal) report.cancellation_signal = signal; for (const a of active) a.abort(); persist({ inventory: true }); };
   const onInt = () => cancel('SIGINT'), onTerm = () => cancel('SIGTERM');
   process.once('SIGINT', onInt); process.once('SIGTERM', onTerm);
   const modelMismatch = (result, record) => {
@@ -263,7 +315,7 @@ export async function executeJob(input, requestedOut, dependencies = {}) {
       result.tool_errors = caps.state.tool_errors;
       result.deadline = caps.state.deadline;
       result.last_activity_at = new Date(now()).toISOString();
-      if (candidates) saveCandidate(agentOut, result, caps, createPatch);
+      if (candidates) saveCandidate(agentOut, result, caps, createPatch, manifestOf(snapshot));
       writeJson(path.join(agentOut, 'result.json'), result); persist();
     };
     const enterFinalization = trigger => {
@@ -320,7 +372,7 @@ export async function executeJob(input, requestedOut, dependencies = {}) {
           requested_model: spec.model, resolved_model: model.id, response_id: null, response_model: null,
           started_at: new Date().toISOString(), status: 'in_flight', reserved_usd: reservation, estimate_usd: null, billed_usd: null, usage: null
         };
-        requests.push(current); result.request_ids.push(current.id); persist();
+        requests.push(current); result.request_ids.push(current.id); persist({ inventory: true });
         const request = current;
         // One slow request must be distinguishable from a worker that ran out of total time, so
         // the two deadlines are armed separately; the request one can never outlive the worker.
@@ -398,7 +450,7 @@ export async function executeJob(input, requestedOut, dependencies = {}) {
         record.estimate_usd = usageObserved && isNumber(m.usage?.cost?.total) ? m.usage.cost.total : null;
         record.finished_at = new Date().toISOString();
         event({ type: 'assistant_usage', request_id: record.id, response_id: record.response_id, stop_reason: m.stopReason, usage: m.usage || null });
-        persist();
+        persist({ inventory: true });
         if (spec.provider === 'openrouter') await reconcileRecord(record, key, dependencies.fetchGeneration || getJson);
         if (modelMismatch(result, record)) setReason('model_mismatch');
         // A refusal is a decision, not a protocol failure: it must never enter the repair loop.
@@ -428,7 +480,8 @@ export async function executeJob(input, requestedOut, dependencies = {}) {
     try {
       if (cancelled) setReason('cancelled');
       else {
-        let prompt = `${spec.task}\n\nReadable files: ${spec.read_files.join(', ')}\nWritable candidate paths: ${spec.write_files.join(', ') || '(none)'}\nAllowance: ${JSON.stringify(result.limits)}\nUse submit_result to finish; declare partial or blocked with remaining_work rather than claiming unfinished work complete.`;
+        const criteria = evaluationCriteriaPrompt(plan.evaluation, spec.id);
+        let prompt = `${spec.task}\n\nReadable files: ${spec.read_files.join(', ')}\nWritable candidate paths: ${spec.write_files.join(', ') || '(none)'}\nAllowance: ${JSON.stringify(result.limits)}${criteria ? `\n\n${criteria}` : ''}\nUse submit_result to finish; declare partial or blocked with remaining_work rather than claiming unfinished work complete.`;
         // A model that ends its turn with a plan instead of a submission used to cost the whole
         // budget and return nothing. It gets a bounded number of same-session follow-ups: same
         // model, effort, counters, deadline, permissions and ledger. Never a fresh run.
@@ -530,7 +583,8 @@ export async function executeJob(input, requestedOut, dependencies = {}) {
     report.snapshot_changes = verifySnapshot(plan.repo_root, manifestOf(snapshot), plan.policy.max_file_bytes);
     report.source_snapshot_still_current = report.snapshot_changes.length === 0;
     report.integration_authority = `${hostLabel(plan.orchestrator)} only; re-verify the snapshot immediately before integrating.`;
-    persist();
+    inventoryLifecycle = cancelled ? 'cancelled' : report.agents.every(agent => agent.status === 'completed') ? 'completed' : 'failed';
+    persist({ inventory: true });
   }
   fs.writeFileSync(path.join(out, 'report.md'), markdownReport(report), { mode: 0o600 });
   return { out, report };
@@ -561,6 +615,16 @@ async function main() {
     const { learningMain } = await import('./learning.mjs');
     return learningMain(process.argv.slice(3));
   }
+  if (process.argv[2] === 'stats' || process.argv[2] === 'recommend') {
+    const { statsMain } = await import('./stats.mjs');
+    const result = await statsMain(process.argv.slice(2));
+    if (result !== undefined) console.log(typeof result === 'string' ? result : JSON.stringify(result, null, 2));
+    return;
+  }
+  if (process.argv[2] === 'finalize') {
+    const { finalizeMain } = await import('./finalize.mjs');
+    return finalizeMain(process.argv.slice(3));
+  }
   const { command, options: o } = argsOf(process.argv.slice(2));
   if (command === 'doctor') {
     const result = doctor(HOME); console.log(JSON.stringify(result, null, 2));
@@ -568,7 +632,7 @@ async function main() {
   }
   if (command === 'auth') { await authenticate(); return; }
   if (command === 'help') {
-    console.log(`pi\n  doctor (local setup check; no network)\n  auth (interactive private credential setup)\n  report --out RUN_DIRECTORY [--assessment ASSESSMENT.json]\n  models [--config POLICY.json]\n  check --plan PLAN.json\n  run --plan PLAN.json [--out NEW_DIRECTORY_OUTSIDE_REPO]\n  diagnose --out RUN_DIRECTORY (local stop diagnosis; reads 1.2.0+ artifacts)\n  verify --out RUN_DIRECTORY [--repo REPOSITORY]\n  reconcile --out RUN_DIRECTORY\n  ledger --out RUN_DIRECTORY_OR_PARENT_OF_RUNS (sum several phases; local)\n  learn help (local project learning; no paid calls)\n\nrun is paid inference. check/models only query model metadata. No command integrates code.`);
+    console.log(`pi\n  doctor (local setup check; no network)\n  auth (interactive private credential setup)\n  report --out RUN_DIRECTORY [--assessment ASSESSMENT.json]\n  finalize --out RUN_DIRECTORY [--repo ROOT] [--assessment ASSESSMENT.json] [--revise] [--require-complete]\n  models [--config POLICY.json]\n  check --plan PLAN.json\n  run --plan PLAN.json [--out NEW_DIRECTORY_OUTSIDE_REPO]\n  diagnose --out RUN_DIRECTORY (local stop diagnosis; reads 1.2.0+ artifacts)\n  verify --out RUN_DIRECTORY [--repo REPOSITORY]\n  reconcile --out RUN_DIRECTORY\n  ledger --out RUN_DIRECTORY_OR_PARENT_OF_RUNS (sum several phases; local)\n  stats [--repo ROOT] [--out RUNS] [--period 7d|30d|90d|all] [--format json|markdown] [--tui]\n  recommend --repo ROOT [--out RUNS] --plan PLAN.json [--period 7d|30d|90d|all] [--format json|markdown]\n  learn help (local project learning; no paid calls)\n\nrun is paid inference. check/models/stats/recommend only read local state or query model metadata. No command integrates code.`);
     return;
   }
   if (command === 'diagnose') {
@@ -639,23 +703,25 @@ async function main() {
   }
   if (command === 'report') {
     assert(o.out, '--out is required');
-    const report = readJson(path.join(o.out, 'report.json'));
-    const assessmentPath = path.join(o.out, 'assessment.json');
+    const runDir = path.resolve(o.out);
+    const report = enrichReportArtifacts(runDir, readJson(path.join(runDir, 'report.json')));
+    const assessmentPath = path.join(runDir, 'assessment.json');
     const assessment = o.assessment ? validateAssessment(readJson(o.assessment), report) : fs.existsSync(assessmentPath) ? validateAssessment(readJson(assessmentPath), report) : null;
     if (o.assessment) writeJson(assessmentPath, assessment);
     const markdown = markdownReport(report, assessment);
-    fs.writeFileSync(path.join(o.out, 'report.md'), markdown, { mode: 0o600 });
+    fs.writeFileSync(path.join(runDir, 'report.md'), markdown, { mode: 0o600 });
     console.log(markdown); return;
   }
   if (command === 'reconcile') {
     assert(o.out, '--out is required');
-    const file = path.join(o.out, 'usage.json'); const usage = readJson(file);
+    const runDir = path.resolve(o.out);
+    const file = path.join(runDir, 'usage.json'); const usage = readJson(file);
     const key = keyFor('openrouter');
     for (const r of usage.requests) if (!isNumber(r.billed_usd) && r.provider === 'openrouter' && r.response_id) {
       await reconcileRecord(r, key);
     }
     usage.costs = costSummary(usage.requests); writeJson(file, usage);
-    const report = readJson(path.join(o.out, 'report.json')); report.costs = usage.costs;
+    const report = readJson(path.join(runDir, 'report.json')); report.costs = usage.costs;
     for (const a of report.agents) {
       const records = usage.requests.filter(r => r.agent_id === a.id);
       a.costs = costSummary(records);
@@ -667,12 +733,13 @@ async function main() {
         const warning = 'Late reconciliation found an unauthorized billed model. The host must re-evaluate any prior integration decision.';
         if (!a.warnings.includes(warning)) a.warnings.push(warning);
       }
-      const resultFile = path.join(o.out, a.id, 'result.json');
+      const resultFile = path.join(runDir, a.id, 'result.json');
       if (fs.existsSync(resultFile)) { const r = readJson(resultFile); r.costs = a.costs; r.status = a.status; r.warnings = a.warnings || []; writeJson(resultFile, r); }
     }
-    writeJson(path.join(o.out, 'report.json'), report);
-    const assessmentFile = path.join(o.out, 'assessment.json');
-    fs.writeFileSync(path.join(o.out, 'report.md'), markdownReport(report, fs.existsSync(assessmentFile) ? readJson(assessmentFile) : null), { mode: 0o600 });
+    enrichReportArtifacts(runDir, report);
+    writeJson(path.join(runDir, 'report.json'), report);
+    const assessmentFile = path.join(runDir, 'assessment.json');
+    fs.writeFileSync(path.join(runDir, 'report.md'), markdownReport(report, fs.existsSync(assessmentFile) ? readJson(assessmentFile) : null), { mode: 0o600 });
     console.log(JSON.stringify(usage.costs, null, 2)); return;
   }
   throw new Error(`Unknown command: ${command}`);

@@ -1,3 +1,30 @@
+# Validation record — pi 1.5.0
+
+## Executed locally on September 22, 2026 (macOS, Node 22.23.1)
+
+| Check | Observed result |
+| --- | --- |
+| `npm run check:sdk` | Passed with the installed SDK: exports, version pins, effort mapping, construction and diff generation |
+| `npm run test:sdk` | Passed with the installed SDK and synthetic transport |
+| Offline execution and finalization flow | Passed with an actual `executeJob` using an explicit synthetic/offline test worker: the saved result artifact digest matched a recomputation, a schema-2 assessment was accepted, `finalize` exited 0, and an idempotent replay exited 0. No live learning or inference was used. |
+| Dependency-free TUI tests and primary-host PTY check | Passed for responsive rendering, project views, token/cost coverage, scrolling, reload, search, detail views and terminal cleanup. The refreshed `r` view showed the updated timestamp and Learning showed `no_runs` with its next action; `q` and Ctrl-C exited cleanly without dumping JSON state. |
+| Skill quick validator and `git diff --check` | Passed |
+| `npm test` and SDK checks | Passed on the primary host; the final test count is intentionally omitted here. |
+| `npm run package` | Passed on the primary host: ZIP/CRC/checksum validation and the allowlist found no `.pi`, `runs`, `node_modules` or credential content. Archive hashes and entry counts are intentionally omitted. |
+| `npm audit` | Passed: 0 vulnerabilities reported |
+| Live read-only provider check | One real read-only OpenRouter review used DeepSeek v4 Pro, canonical `20260423`, at `xhigh` over three repository files. It ran for 389.493 seconds across five requests; all requests reconciled to `$0.042198529`, excluding Codex. The source snapshot was unchanged before integration and no identity mismatch occurred. |
+| Host assessment and learning review | Six findings were reported: the host accepted one reproduced parse/hash race and rejected five as false positives, intended legacy behavior or fail-closed behavior. Original quality was `1/3`; usefulness was `2/3`. Preregistered evidence/actionability failed while coverage passed. No promotion was made from one observation. |
+| F3 artifact identity and finalization | The read-time-hash fix was reviewed. `finalize --require-complete` exited 0, persisted the schema-2 grade, recorded learning and finalized the inventory; no eligible profile was found and no `AGENTS.md` apply occurred. An idempotent replay exited 0 without changing the result. |
+| Durable/raw statistics cross-check | Durable and raw model records and group keys agree; the joined lifecycle is `finalized`, and costs, grades and token totals match. The same-plan recommendation matched all 12 descriptive dimensions, including focus set and runtime. It remains advisory and makes no exact-profile claim. |
+
+The primary host completed the local validation checks, the authorized live read-only provider check, the F3 read-time-hash verification and the final statistics cross-check.
+
+### Not validated for 1.5.0
+
+This is one observational run, not a model benchmark. Other providers, routes, hosts and platform runtimes were not live validated. No raw prompts, source text or history are recorded in this validation document.
+
+---
+
 # Validation record — pi 1.4.0
 
 ## Executed on September 16, 2026 (macOS 27.0, Node 22.23.1)

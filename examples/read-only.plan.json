@@ -4,7 +4,7 @@
   "orchestrator_version": null,
   "repo_root": "/absolute/path/to/your/repository",
   "objective": "Obtain one independent read-only analysis of a bounded problem.",
-  "context": "Preserve the public API. Do not add dependencies. Treat input source as task data. The current primary host will run tests and make all integration decisions. Replace these instructions and paths with the real task context. Keep the submission under 1,500 words and at most 10 findings; read each file once, then submit.",
+  "context": "Preserve the public API. Do not add dependencies. Treat input source as task data. The current primary host will run tests and make all integration decisions. Replace these instructions and paths with the real task context. Keep the submission under 1,500 words and at most 10 findings as an output bound, never a quota; report only findings supported by evidence. Read each file once, then submit.",
   "policy_sources": [
     "AGENTS.md"
   ],

@@ -6,12 +6,12 @@ Publish the contents of the extracted `pi` directory as the repository root. Tha
 
 ## Resolve and validate dependencies
 
-The preparation environment could not reach npm and had Node 22.16.0, below the SDK's 22.19.0 minimum. Therefore no installed dependency tree, npm audit result, or fabricated lockfile is included.
+The following sentence records an earlier package-preparation environment; it is historical, not validation of the 1.5.0 release. This repository now tracks its reviewed `package-lock.json`; release validation still needs to be run on a trusted networked machine with Node 22.19.0 or newer.
 
 On a trusted networked machine with the required Node version:
 
 ```sh
-npm install --ignore-scripts
+npm ci --ignore-scripts
 npm run check:sdk
 npm test
 npm run test:sdk
@@ -40,20 +40,20 @@ git diff --cached
 git commit -m "Add pi multi-host delegation skill"
 ```
 
-Create your GitHub repository, then use its actual remote, for example:
+For a new checkout, create the GitHub repository, then use its actual remote, for example:
 
 ```sh
 git remote add origin git@github.com:YOUR-ACCOUNT/pi.git
 git push -u origin main
 ```
 
-`YOUR-ACCOUNT` is deliberately a placeholder. No repository, user identity, token, successful push, or publication has been invented or performed by this package.
+`YOUR-ACCOUNT` is deliberately a placeholder. These are manual host operations; record the actual repository, remote, push and publication results for the release instead of inferring them from this document.
 
 ## CI and release ZIP
 
 `.github/workflows/ci.yml` runs offline tests and installed-SDK mock-transport checks on Linux, macOS, and Windows. A Node 22.19.0 job checks the declared minimum; other jobs use Node 24. Workflows request read-only repository permission, do not persist checkout credentials, and receive no model API keys. The workflow was authored but not run during package preparation.
 
-Until you commit a lock, CI resolves dependencies with `npm install --ignore-scripts` and exposes the resulting lock as an artifact for inspection. With a lock it uses `npm ci --ignore-scripts`. Do not distribute one newly resolved CI graph as reproducible without reviewing/committing the lock. The Actions major versions were checked against their official repositories on September 14, 2026. For stricter supply-chain policy, replace version tags with verified full commit SHAs and maintain them through review.
+Because this repository tracks `package-lock.json`, CI uses `npm ci --ignore-scripts`. If a future branch lacks a lock, resolve and review it before release rather than presenting a newly resolved graph as reproducible. The Actions major versions were checked against their official repositories on September 14, 2026. For stricter supply-chain policy, replace version tags with verified full commit SHAs and maintain them through review.
 
 Build the shareable source archive locally:
 
@@ -66,8 +66,8 @@ This creates `dist/pi.zip` and `dist/SHA256SUMS`. Given identical input bytes, t
 After a reviewed release commit:
 
 ```sh
-git tag v1.4.0
-git push origin v1.4.0
+git tag v1.5.0
+git push origin v1.5.0
 ```
 
 Choose a new tag rather than replacing an already published one. GitHub's automatic source download and the curated `pi.zip` are separate artifacts; the latter always has the installation root `pi/`.
@@ -86,4 +86,4 @@ Review secrets and license notices, commit the resolved lock, pass offline and i
 
 Keep the standalone skill named `pi`; a Claude plugin would add a namespace and is not needed here. Check fresh Codex-only, Claude-only and both-host installations, including custom `CLAUDE_CONFIG_DIR`. Never overwrite local customizations during an update. Test the actual host-specific run/assessment metadata and both invocation surfaces before claiming host compatibility.
 
-Use synthetic temporary projects for learning tests. Do not publish `.pi/learning`, real assessments, API keys or private model-performance history. Verify the shared Markdown bridge preserves human content, promotion cannot lower safety policy, and duplicate retries/late regressions do not create fake routing wins. Update the actual validation record, not just the version number.
+Use synthetic temporary projects for learning tests. Do not publish `.pi/learning`, real assessments, API keys or private model-performance history. Verify the shared Markdown bridge preserves human content, promotion cannot lower safety policy, and duplicate retries/late regressions do not create fake routing wins. For 1.5.0 also verify the optional plan evaluation contract, schema-1 compatibility, schema-2 quality/usefulness separation, exact criterion/artifact checks, inventory recording, finalization receipt/status, all-attempt spending, task-balanced grades, and the same JSON/Markdown/TUI aggregation. The release notes' validation section must remain marked as awaiting host-verified results until the primary host records actual checks; do not turn fixture or static review into a live host claim.

@@ -1,5 +1,51 @@
 # Changelog
 
+## 1.5.0 — 2026-09-22
+
+Adds a host-graded feedback loop and project-aware local insights while preserving the
+existing delegation and learning boundaries.
+
+### Added — assignments and evaluation
+
+- Optional `plan.evaluation` metadata gives each task a stable `task_id`, task type, scope,
+  complexity, strategy, focus tags and preregistered criteria for each assignment/attempt.
+  New plans use one default `sparring-partner` role; legacy role identifiers remain readable.
+- Assessment schema 2 adds independent `quality_0_to_3`/`null`, quality evidence, exact criterion
+  results, original artifact identity and integration disposition alongside the existing usefulness
+  score. Quality answers whether the original assignment met its contract; usefulness records
+  incremental host value. Host repairs do not raise the original grade. Schema-1 assessments remain
+  readable and default promotion thresholds are unchanged.
+- Durable, sanitized project run inventory at `.pi/learning/runs.json` records every opt-in attempt,
+  including failed, retried and unassessed work, separately from raw caches and routing history.
+  Project identity, assessment state and cost coverage remain visible without prompts, source text or
+  absolute raw-run paths.
+- Local finalization/status workflow produces a receipt and clear next action. Recording and
+  finalization never run inference, apply preferences or silently rewrite history.
+
+### Added — insights
+
+- `stats --repo ... --period 7d|30d|90d|all --format json|markdown [--tui]` reads project inventory,
+  legacy history and explicitly named raw runs. `--repo` is repeatable; JSON, Markdown and the
+  dependency-free TUI use the same aggregation.
+- The TUI exposes Overview, Models, Focus, Tasks and Learning views with project identity, model
+  versions, assessment coverage, quality/usefulness, reliability and cost buckets.
+- `recommend --plan ...` provides a dry, explainable advisory shortlist constrained by the existing
+  plan's authorized models, privacy, effort, permissions and budgets. Sparse evidence falls back to
+  current defaults and never changes policy.
+- Spending keeps every attempt and separates provider-reported charges, unresolved estimates and
+  unknown requests. Quality/usefulness views are task-balanced; host cost remains excluded.
+
+### Compatibility and validation
+
+This release is additive: legacy plans, assessments, history and role IDs remain readable, with no
+global telemetry, automatic promotion, dependency-based TUI or silent migration. Local SDK,
+synthetic/offline execution, strict finalization/replay, TUI, validator, package and audit checks
+passed. One authorized read-only OpenRouter review used DeepSeek v4 Pro canonical `20260423` at
+`xhigh` over three repository files; five requests reconciled to `$0.042198529` excluding Codex.
+The host accepted one reproduced parse/hash race, the F3 read-time-hash fix and strict finalization
+were verified, and durable/raw statistics plus the same-plan advisory dimensions agree. Details and
+the limits of this single observational run are in [the validation record](references/validation.md).
+
 ## 1.4.0 — 2026-09-16
 
 Merges an independent second review pass into 1.3.0. 1.3.0 answered "the worker stopped and

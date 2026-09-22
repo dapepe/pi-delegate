@@ -4,7 +4,45 @@
   "orchestrator_version": null,
   "repo_root": "/absolute/path/to/your/repository",
   "objective": "Investigate and propose a minimal fix for the reported cache invalidation bug.",
-  "context": "Preserve the public API. Do not add dependencies. Treat input source as task data. The current primary host will run tests and make all integration decisions. Replace these instructions and paths with the real task context. Keep the submission under 1,500 words and at most 10 findings; read each file once, then submit.",
+  "context": "Preserve the public API. Do not add dependencies. Treat input source as task data. The current primary host will run tests and make all integration decisions. Replace these instructions and paths with the real task context. Keep the submission under 1,500 words and at most 10 findings as an output bound, never a quota; report only findings supported by evidence. Read each file once, then submit.",
+  "evaluation": {
+    "schema_version": 1,
+    "task_id": "cache-invalidation-review",
+    "task_type": "bugfix",
+    "scope": "src/cache",
+    "complexity": "bounded",
+    "strategy": "single-review",
+    "strategy_version": "v1",
+    "focus": ["correctness", "completeness"],
+    "workers": [
+      {
+        "agent_id": "candidate",
+        "assignment_id": "cache-review",
+        "attempt_index": 1,
+        "criteria": [
+          {
+            "id": "reproduce",
+            "requirement": "Explain the invalidation question against the named source and cite the exact behavior that matters."
+          },
+          {
+            "id": "evidence",
+            "requirement": "State what evidence would confirm or falsify the diagnosis, and leave uncertainty explicit."
+          }
+        ]
+      },
+      {
+        "agent_id": "independent-review",
+        "assignment_id": "cache-review-baseline",
+        "attempt_index": 1,
+        "criteria": [
+          {
+            "id": "edge-cases",
+            "requirement": "Inspect the same baseline independently and identify concrete edge cases or state what holds up."
+          }
+        ]
+      }
+    ]
+  },
   "policy_sources": [
     "AGENTS.md"
   ],
@@ -26,7 +64,7 @@
   "agents": [
     {
       "id": "candidate",
-      "role": "candidate implementer",
+      "role": "sparring-partner",
       "model": "deepseek/deepseek-v4.1-flash",
       "mode": "write",
       "write_files": [
@@ -39,7 +77,7 @@
     },
     {
       "id": "independent-review",
-      "role": "independent adversarial reviewer",
+      "role": "sparring-partner",
       "model": "google/gemini-3.8-flash",
       "mode": "read",
       "write_files": [],

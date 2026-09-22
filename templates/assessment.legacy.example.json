@@ -1,0 +1,13 @@
+{
+  "run_id": "REPLACE_WITH_ACTUAL_RUN_ID",
+  "assessed_by": "Codex",
+  "overall_value": "EXAMPLE ONLY: replace with the host's assessment.",
+  "workers": [
+    {
+      "agent_id": "review",
+      "usefulness_0_to_3": 1,
+      "reason": "EXAMPLE ONLY: a clean review supplied useful assurance."
+    }
+  ],
+  "decisions": []
+}

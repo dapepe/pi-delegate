@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { TextDecoder } from 'node:util';
+import { ROLE_DEFAULT, validateEvaluation } from './evaluation.mjs';
 
 export const HOSTS = Object.freeze({ codex: 'Codex', 'claude-code': 'Claude Code' });
 export function hostLabel(host = 'codex') { assert(Object.hasOwn(HOSTS, host), 'Orchestrator must be codex or claude-code'); return HOSTS[host]; }
@@ -181,7 +182,7 @@ export function openRouterModel(item, routing) {
 }
 export function validatePlan(input, defaults) {
   assert(input && typeof input === 'object' && !Array.isArray(input), 'Plan must be an object');
-  const allowed = new Set(['repo_root', 'objective', 'context', 'policy', 'policy_sources', 'read_files', 'agents', 'orchestrator', 'orchestrator_model', 'orchestrator_version']);
+  const allowed = new Set(['repo_root', 'objective', 'context', 'policy', 'policy_sources', 'read_files', 'agents', 'evaluation', 'orchestrator', 'orchestrator_model', 'orchestrator_version']);
   for (const key of Object.keys(input)) assert(allowed.has(key), `Unknown plan key: ${key}`);
   const orchestrator = input.orchestrator ?? 'codex';
   hostLabel(orchestrator);
@@ -204,7 +205,8 @@ export function validatePlan(input, defaults) {
     assert(typeof a.id === 'string' && /^[a-z][a-z0-9_-]{0,47}$/.test(a.id) && !ids.has(a.id), 'Agent IDs must be unique, portable lowercase names');
     cleanRel(a.id); // Output directories must also be portable on Windows.
     ids.add(a.id);
-    text(a.role, 'role', 300); text(a.task, 'task'); text(a.selection_reason, 'selection_reason', 4000); text(a.model, 'model', 200);
+    const role = a.role ?? ROLE_DEFAULT;
+    text(role, 'role', 300); text(a.task, 'task'); text(a.selection_reason, 'selection_reason', 4000); text(a.model, 'model', 200);
     const provider = a.provider || policy.preferred_provider;
     assert(PROVIDERS.has(provider), `Unsupported provider: ${provider}`);
     if (provider !== policy.preferred_provider || !policy.preferred_models.includes(a.model)) {
@@ -219,7 +221,7 @@ export function validatePlan(input, defaults) {
     const effort = a.effort || policy.default_effort;
     assert(['xhigh', 'max'].includes(effort), 'Each requested effort must be xhigh or max');
     workerPolicy(policy, a.limits); // A per-worker allocation may narrow the plan ceiling, never raise it.
-    return { ...a, provider, effort, read_files: accessible, write_files: writable };
+    return { ...a, role, provider, effort, read_files: accessible, write_files: writable };
   });
   const paths = [...new Set([...readFiles, ...agents.flatMap(a => a.write_files)])];
   const portable = new Set();
@@ -232,7 +234,8 @@ export function validatePlan(input, defaults) {
     const parts = file.split('/');
     while (parts.length > 1) { parts.pop(); assert(!portable.has(parts.join('/')), 'File/directory path grants overlap'); }
   }
-  return { ...input, orchestrator, repo_root: repo, policy, read_files: readFiles, agents };
+  const evaluation = input.evaluation === undefined ? undefined : validateEvaluation(input.evaluation, agents);
+  return { ...input, orchestrator, repo_root: repo, policy, read_files: readFiles, agents, ...(evaluation ? { evaluation } : {}) };
 }
 export function captureSnapshot(plan) {
   const baseline = new Map();

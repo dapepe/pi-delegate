@@ -1,4 +1,5 @@
 {
+  "schema_version": 2,
   "run_id": "REPLACE_WITH_ACTUAL_RUN_ID",
   "assessed_by": "Claude Code",
   "decisions": [
@@ -23,28 +24,44 @@
     {
       "agent_id": "candidate",
       "usefulness_0_to_3": 0,
-      "reason": "EXAMPLE ONLY: replace the score and reason after assessing the actual run."
+      "reason": "EXAMPLE ONLY: replace the score and reason after assessing the actual run.",
+      "quality_0_to_3": null,
+      "quality_reason": "EXAMPLE ONLY: explain the independently checked quality or leave null when unknown.",
+      "criterion_results": [
+        { "id": "reproduce", "result": "not_run", "evidence": [] },
+        { "id": "evidence", "result": "not_run", "evidence": [] }
+      ],
+      "artifact_sha256": null,
+      "integration_status": "candidate_only"
     },
     {
       "agent_id": "independent-review",
       "usefulness_0_to_3": 0,
-      "reason": "EXAMPLE ONLY: replace the score and reason after assessing the actual run."
+      "reason": "EXAMPLE ONLY: replace the score and reason after assessing the actual run.",
+      "quality_0_to_3": null,
+      "quality_reason": "EXAMPLE ONLY: replace with the host's independent quality judgment.",
+      "criterion_results": [
+        { "id": "edge-cases", "result": "not_run", "evidence": [] }
+      ],
+      "artifact_sha256": null,
+      "integration_status": "not_applicable"
     }
   ],
   "overall_value": "EXAMPLE ONLY: replace with the current host's assessment of incremental value after verification.",
   "cost_source": "usage.json; preserve the reported/estimated/unknown distinction",
   "host_cost": "unavailable; excluded",
   "learning": {
-    "task_id": "replace-with-stable-task-id",
+    "task_id": "cache-invalidation-review",
     "task_type": "bugfix",
-    "scope": ".",
+    "scope": "src/cache",
     "complexity": "bounded",
-    "strategy": "parallel-independent",
+    "strategy": "single-review",
     "strategy_version": "v1",
+    "focus": ["correctness", "completeness"],
     "workers": [
       {
         "agent_id": "candidate",
-        "role": "candidate",
+        "role": "sparring-partner",
         "outcome": "inconclusive",
         "validation": "not-run",
         "evidence": [],
@@ -54,7 +71,7 @@
       },
       {
         "agent_id": "independent-review",
-        "role": "correctness-review",
+        "role": "sparring-partner",
         "outcome": "inconclusive",
         "validation": "not-run",
         "evidence": [],

@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { initLearning, setLearningMode, recordLearning, learningSummary, proposeLearning, applyLearning, replaceLearnedBlock, START, END, validateLearningConfig, validateLearningAssessment } from '../scripts/learning.mjs';
 import { readLocal, writeLocal, bytesHash, claudeImportText } from '../scripts/project-files.mjs';
 import { hostLabel, costSummary } from '../scripts/lib.mjs';
+import { computeArtifactIdentity } from '../scripts/evaluation.mjs';
 const NOW = Date.parse('2026-09-14T12:00:00Z');
 const json = (file,value) => fs.writeFileSync(file,JSON.stringify(value,null,2)+'\n');
 function fixture(mode='propose') {
@@ -108,4 +109,34 @@ test('a partial worker result keeps its stop diagnostic in the observation',()=>
   assert.equal(observation.failure_class,'partial');
   assert.equal(observation.limit_usage.completion_repairs,1);
   assert.equal(observation.recovery_events[0].mode,'bounded_continuation');
+}));
+
+test('schema-2 learning keeps sanitized assignment and quality metadata with a versioned dated-model profile',()=>withFixture(f=>{
+  const r=f.make(20);
+  const artifact=computeArtifactIdentity({submission:r.report.agents[0].submission,manifest:[],snapshot:r.snapshot}).artifact_sha256;
+  r.report.evaluation={schema_version:1,task_id:'task-20',task_type:'bugfix',scope:'src/api',complexity:'bounded',strategy:'single-review',strategy_version:'v1',focus:['correctness','security'],workers:[{agent_id:'review',assignment_id:'assignment-20',attempt_index:1,criteria:[{id:'behavior',requirement:'Synthetic criterion.'}]}]};
+  r.plan.evaluation=structuredClone(r.report.evaluation);
+  r.report.agents[0].artifact_identity={schema_version:1,artifact_sha256:artifact};
+  r.report.agents[0].model.catalog_alias_target={slug:'provider/model-latest',canonical_slug:'provider/model-20260901'};
+  r.assessment.schema_version=2;
+  r.assessment.workers[0].quality_0_to_3=2;
+  r.assessment.workers[0].quality_reason='Synthetic host quality reason must not be persisted.';
+  r.assessment.workers[0].criterion_results=[{id:'behavior',result:'passed',evidence:['Synthetic evidence reference.']}];
+  r.assessment.workers[0].artifact_sha256=artifact;
+  r.assessment.workers[0].integration_status='accepted_unmodified';
+  r.assessment.learning.task_id='task-20';
+  r.assessment.learning.focus=['correctness','security'];
+  r.assessment.learning.task_type='bugfix';
+  r.save();
+  fs.mkdirSync(path.join(r.out,'review'),{mode:0o700});
+  json(path.join(r.out,'review','result.json'),{submission:r.report.agents[0].submission,changes:[]});
+  r.record();
+  const history=JSON.parse(fs.readFileSync(path.join(f.repo,'.pi/learning/history.json'),'utf8'));
+  const observation=history.runs.at(-1).current.observations[0];
+  assert.equal(observation.profile.profile_schema_version,2);
+  assert.equal(observation.profile.model_identity,'provider/model-20260901');
+  assert.deepEqual(observation.evaluation_metadata,{schema_version:2,focus:['correctness','security'],assignment_id:'assignment-20',attempt_index:1,criteria:[{id:'behavior',result:'passed',evidence_count:1}],quality_0_to_3:2,artifact_sha256:artifact,integration_status:'accepted_unmodified'});
+  assert.equal('quality_reason' in observation,false);
+  assert.equal(JSON.stringify(observation).includes('Synthetic host quality reason must not be persisted.'),false);
+  assert.equal(learningSummary(f.repo,NOW).profiles[0].profile_schema_version,2);
 }));

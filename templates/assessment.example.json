@@ -1,4 +1,5 @@
 {
+  "schema_version": 2,
   "run_id": "REPLACE_WITH_ACTUAL_RUN_ID",
   "assessed_by": "Codex",
   "decisions": [
@@ -23,12 +24,27 @@
     {
       "agent_id": "candidate",
       "usefulness_0_to_3": 0,
-      "reason": "EXAMPLE ONLY: replace the score and reason after assessing the actual run."
+      "reason": "EXAMPLE ONLY: replace the score and reason after assessing the actual run.",
+      "quality_0_to_3": null,
+      "quality_reason": "EXAMPLE ONLY: use null when the host cannot independently judge task quality; otherwise explain the verified score.",
+      "criterion_results": [
+        { "id": "reproduce", "result": "not_run", "evidence": [] },
+        { "id": "evidence", "result": "not_run", "evidence": [] }
+      ],
+      "artifact_sha256": null,
+      "integration_status": "candidate_only"
     },
     {
       "agent_id": "independent-review",
       "usefulness_0_to_3": 0,
-      "reason": "EXAMPLE ONLY: replace the score and reason after assessing the actual run."
+      "reason": "EXAMPLE ONLY: replace the score and reason after assessing the actual run.",
+      "quality_0_to_3": null,
+      "quality_reason": "EXAMPLE ONLY: replace with the host's independent quality judgment.",
+      "criterion_results": [
+        { "id": "edge-cases", "result": "not_run", "evidence": [] }
+      ],
+      "artifact_sha256": null,
+      "integration_status": "not_applicable"
     }
   ],
   "overall_value": "EXAMPLE ONLY: replace with the current host's assessment of incremental value after verification.",

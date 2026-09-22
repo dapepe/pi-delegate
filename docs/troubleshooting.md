@@ -1,6 +1,6 @@
 # Early stops, partial results, and safe continuation
 
-This guide applies to `pi` 1.4.0. The diagnosis command also reads 1.2.0 and 1.3.0 artifacts. Do not delete a failed run or launch the same plan again merely because the host stopped displaying output.
+This guide applies to `pi` 1.5.0. The diagnosis command also reads 1.2.0–1.4.0 artifacts. Do not delete a failed run or launch the same plan again merely because the host stopped displaying output.
 
 ## Identify the layer before changing limits
 
@@ -100,6 +100,8 @@ Candidate edits are atomically exported after completed edit-tool events, and re
 
 A kill can lose the latest uncheckpointed event. Updates across candidate, result and usage files are not one database transaction. Treat an interrupted checkpoint as unvalidated material; verify recorded candidate hashes and the source snapshot before using it.
 
+When project learning is initialized, the durable `.pi/learning/runs.json` inventory still records the attempt status and cost buckets even when the raw run directory is incomplete. It has no raw path or source text. Use `learn status` or `stats` to see whether assessment is missing and what next action remains. A finalization receipt is a local status record; it never repairs a candidate, runs tests or applies a preference.
+
 This release has **in-process continuation**, not a persistent transcript resume command and not a detached daemon. After the process dies, the host must review the checkpoint and deliberately construct a new bounded task packet. Preserve the original learning task ID and account for the cost of all attempts. Do not call a fresh run a resumed session or claim it preserves provider reasoning or signatures.
 
 Cancellation is cooperative via the Pi SDK. An adapter that ignores abort, or an event-loop-blocking dependency, cannot be forcibly isolated inside this process. True per-worker process supervision with graceful-stop/kill escalation and durable compatible transcripts is a separate future hardening step, not implemented here.
@@ -109,6 +111,8 @@ Cancellation is cooperative via the Pi SDK. An adapter that ignores abort, or an
 Use `failure_kind: "limit"` for a validated timeout, quota or context-admission outcome; it is an operational failure, not evidence that the model's reasoning was wrong. Provider, packet, host and unknown causes remain distinct. A timeout alone cannot establish causality or justify a negative model-quality lesson.
 
 Runtime allocations, effective output allowance, completion recovery and companion-worker allocations contribute to local profile metadata. Trials with different allowances no longer pool as the same routing profile. Independently useful partial findings can be accepted by the host, but an incomplete assignment is not promoted as a successful completed strategy. Any changed strategy or task allocation needs the same host review as model selection.
+
+Schema-2 assessments separate `quality_0_to_3` (the original assignment against preregistered criteria) from `usefulness_0_to_3` (incremental host value). A clean verified review can be high quality and usefulness 1. Numeric quality requires exact criterion coverage, evidence for passed/failed criteria, and an actual saved artifact identity with its matching original hash. A host repair or later rewrite does not change the original grade. Schema-1 assessments remain readable.
 
 ## Sources checked 2026-09-15
 

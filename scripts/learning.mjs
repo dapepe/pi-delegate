@@ -6,10 +6,13 @@ import { pathToFileURL } from 'node:url';
 import { assert, text, cleanRel, sha256, hostLabel, costSummary, isNumber, inside, authorizedIdentities, workerPolicy } from './lib.mjs';
 import { runtimeLimits } from './runtime.mjs';
 import { validateAssessment } from './report.mjs';
+import { evaluationsMatch, readArtifactIdentity } from './evaluation.mjs';
+import { readRunInventory } from './insights-store.mjs';
 import { projectRoot, localPath, readLocal, writeLocal, bytesHash, jsonText, loadJson, ensureState, withLock, plainLines, claudeImportText } from './project-files.mjs';
 export const START = '<!-- pi:learned:start -->', END = '<!-- pi:learned:end -->';
 const DIR = '.pi/learning', CONFIG = `${DIR}/config.json`, HISTORY = `${DIR}/history.json`, PROPOSAL = `${DIR}/proposal.json`;
 const DAY = 86400000;
+export const PROFILE_SCHEMA_VERSION = 2;
 export const LEARNING_DEFAULTS = Object.freeze({ schema_version: 1, mode: 'propose', min_distinct_tasks: 3, min_useful_fraction: 0.75, max_age_days: 90, max_rules: 6, max_block_bytes: 4096 });
 export const STRATEGIES = Object.freeze({
   'single-review': 'one bounded independent review',
@@ -19,7 +22,9 @@ export const STRATEGIES = Object.freeze({
   'design-challenge': 'a focused challenge to a proposed design',
   'edge-case-review': 'a targeted edge-case and test review'
 });
-const ROLES = ['scout', 'candidate', 'correctness-review', 'test-review', 'design-challenger'];
+const ROLES = ['scout', 'candidate', 'correctness-review', 'test-review', 'design-challenger', 'sparring-partner'];
+const V2_RESULTS = new Set(['passed', 'failed', 'inconclusive', 'not_run']);
+const V2_INTEGRATION = new Set(['not_assessed', 'not_applicable', 'candidate_only', 'accepted_modified', 'accepted_unmodified', 'rejected', 'deferred', 'unknown']);
 const slug = (value, label) => { text(value, label, 120); assert(/^[a-z0-9][a-z0-9_.-]*$/.test(value), `${label} must be a lowercase non-sensitive identifier`); return value; };
 const digest = value => sha256(JSON.stringify(value));
 // Only identifier-like rendered data enters AGENTS.md. No free-form worker or reflection text is imported.
@@ -38,8 +43,39 @@ function configOf(root) { return validateLearningConfig(loadJson(root, CONFIG));
 function historyOf(root, config) {
   const history = loadJson(root, HISTORY, { schema_version: 1, project_id: config.project_id, runs: [] });
   assert(history.schema_version === 1 && history.project_id === config.project_id && Array.isArray(history.runs) && history.runs.length <= 10000, 'Invalid or foreign project history');
-  for (const run of history.runs) assert(run && run.current && run.current.project_id === config.project_id && run.key === run.current.key && Array.isArray(run.current.observations), 'Invalid history run');
+  for (const run of history.runs) {
+    assert(run && run.current && run.current.project_id === config.project_id && run.key === run.current.key && Array.isArray(run.current.observations), 'Invalid history run');
+    for (const observation of run.current.observations) {
+      if (observation.evaluation_metadata !== undefined) validateEvaluationMetadata(observation.evaluation_metadata);
+      if (observation.profile?.profile_schema_version !== undefined) {
+        assert(observation.profile.profile_schema_version === PROFILE_SCHEMA_VERSION, 'Unsupported learning profile schema version');
+        assert(observation.evaluation_metadata?.schema_version === 2, 'Version-2 learning profiles require evaluation metadata');
+      }
+      if (observation.evaluation_metadata !== undefined) assert(observation.profile?.profile_schema_version === PROFILE_SCHEMA_VERSION, 'Version-2 evaluation metadata requires a version-2 learning profile');
+    }
+  }
   return history;
+}
+function validateEvaluationMetadata(value) {
+  assert(value && typeof value === 'object' && !Array.isArray(value), 'Invalid learning evaluation metadata');
+  for (const key of Object.keys(value)) assert(['schema_version', 'focus', 'assignment_id', 'attempt_index', 'criteria', 'quality_0_to_3', 'artifact_sha256', 'integration_status'].includes(key), `Unknown learning evaluation metadata field: ${key}`);
+  assert(value.schema_version === 2, `Unsupported learning evaluation metadata schema version: ${value.schema_version}`);
+  assert(Array.isArray(value.focus) && value.focus.length <= 8 && value.focus.every(item => typeof item === 'string' && /^[a-z][a-z0-9-]{0,47}$/.test(item)), 'Invalid learning evaluation focus');
+  slug(value.assignment_id, 'learning assignment_id', 128);
+  assert(Number.isInteger(value.attempt_index) && value.attempt_index >= 1 && value.attempt_index <= 999, 'Invalid learning attempt_index');
+  assert(Array.isArray(value.criteria) && value.criteria.length >= 1 && value.criteria.length <= 8, 'Invalid learning criteria metadata');
+  const ids = new Set();
+  for (const criterion of value.criteria) {
+    assert(criterion && typeof criterion === 'object' && !Array.isArray(criterion), 'Invalid learning criterion metadata');
+    for (const key of Object.keys(criterion)) assert(['id', 'result', 'evidence_count'].includes(key), `Unknown learning criterion field: ${key}`);
+    slug(criterion.id, 'learning criterion id', 48); assert(!ids.has(criterion.id), 'Duplicate learning criterion metadata id'); ids.add(criterion.id);
+    assert(V2_RESULTS.has(criterion.result), 'Invalid learning criterion result');
+    assert(Number.isInteger(criterion.evidence_count) && criterion.evidence_count >= 0 && criterion.evidence_count <= 4, 'Invalid learning criterion evidence count');
+  }
+  assert(value.quality_0_to_3 === null || (Number.isInteger(value.quality_0_to_3) && value.quality_0_to_3 >= 0 && value.quality_0_to_3 <= 3), 'Invalid learning quality grade');
+  assert(value.artifact_sha256 === null || (typeof value.artifact_sha256 === 'string' && /^[a-f0-9]{64}$/.test(value.artifact_sha256)), 'Invalid learning artifact identity');
+  assert(typeof value.integration_status === 'string' && V2_INTEGRATION.has(value.integration_status), 'Invalid learning integration status');
+  return value;
 }
 export function initLearning(repo, { mode = 'propose', claudeImport = false } = {}) {
   assert(['off', 'propose', 'auto'].includes(mode), 'mode must be off, propose, or auto');
@@ -73,11 +109,17 @@ export function validateLearningAssessment(assessment, report) {
   validateAssessment(assessment, report);
   const l = assessment.learning;
   assert(l && typeof l === 'object', 'assessment.learning is required; use the learning assessment template');
-  for (const k of Object.keys(l)) assert(['task_id','task_type','scope','complexity','strategy','strategy_version','workers'].includes(k), `Unknown learning field: ${k}`);
+  for (const k of Object.keys(l)) assert(['task_id','task_type','scope','complexity','strategy','strategy_version','focus','workers'].includes(k), `Unknown learning field: ${k}`);
   slug(l.task_id, 'task_id'); slug(l.task_type, 'task_type'); slug(l.strategy_version, 'strategy_version');
+  if (l.focus !== undefined) assert(Array.isArray(l.focus) && l.focus.length <= 8 && l.focus.every(value => typeof value === 'string' && /^[a-z][a-z0-9-]{0,31}$/.test(value)), 'learning.focus must be a bounded tag array');
   assert(l.scope === '.' || (typeof l.scope === 'string' && cleanRel(l.scope)), 'scope must be . or a relative project path');
   assert(['bounded', 'complex'].includes(l.complexity), 'complexity must be bounded or complex');
   assert(Object.hasOwn(STRATEGIES, l.strategy), 'Use a documented strategy; add and test new strategy vocabulary in the skill, not in worker output');
+  if (assessment.schema_version === 2) {
+    assert(report.evaluation?.schema_version === 1, 'Assessment v2 learning must reuse the validated plan evaluation metadata');
+    for (const key of ['task_id', 'task_type', 'scope', 'complexity', 'strategy', 'strategy_version']) assert(l[key] === report.evaluation[key], `assessment.learning.${key} must match plan.evaluation`);
+    assert(JSON.stringify(l.focus || []) === JSON.stringify(report.evaluation.focus || []), 'assessment.learning.focus must match plan.evaluation.focus');
+  }
   assert(Array.isArray(l.workers) && l.workers.length === report.agents.length, 'Learning must cover every worker');
   const seen = new Set();
   for (const w of l.workers) {
@@ -92,7 +134,16 @@ export function validateLearningAssessment(assessment, report) {
     assert(['none','minor','major','unknown'].includes(w.rework), 'Invalid rework');
     assert(Array.isArray(w.evidence) && w.evidence.length <= 20 && w.evidence.every(e => typeof e === 'string' && e.trim() && e.length <= 2000), 'Evidence must be a bounded, sanitized string array');
     assert(w.validation === 'not-run' || w.evidence.length > 0, 'Validation needs host evidence references');
-    if (w.outcome === 'useful') assert(score >= 2 && w.validation === 'passed' && w.failure_kind === 'none' && w.regression === 'none-observed' && a.status === 'completed' && !(a.policy_violations?.length) && !['major','unknown'].includes(w.rework), 'Useful routing evidence needs a completed, independently validated contribution without regression or major/unknown rework');
+    if (w.outcome === 'useful') {
+      assert(score >= 2 && w.validation === 'passed' && w.failure_kind === 'none' && w.regression === 'none-observed' && a.status === 'completed' && !(a.policy_violations?.length) && !['major','unknown'].includes(w.rework), 'Useful routing evidence needs a completed, independently validated contribution without regression or major/unknown rework');
+      if (assessment.schema_version === 2) {
+        const graded = assessment.workers.find(item => item.agent_id === w.agent_id);
+        assert(graded?.quality_0_to_3 !== null && graded?.quality_0_to_3 >= 2, 'Useful v2 learning needs a positive host quality grade');
+        const planned = report.evaluation?.workers?.find(item => item.agent_id === w.agent_id)?.criteria || [];
+        assert(planned.length > 0 && graded.criterion_results?.length === planned.length && planned.every(item => graded.criterion_results.some(result => result.id === item.id && result.result === 'passed')), 'Useful v2 learning needs every preregistered criterion to pass');
+        assert(graded.artifact_sha256 && a.artifact_identity?.artifact_sha256 === graded.artifact_sha256, 'Useful v2 learning needs the original submission/candidate artifact identity');
+      }
+    }
     if (w.outcome === 'harmful' || w.regression === 'confirmed') assert(w.evidence.length > 0 && w.validation !== 'not-run', 'Negative quality evidence requires independent validation');
     if (w.regression === 'confirmed') assert(w.outcome === 'harmful', 'A confirmed regression must be classified harmful');
   }
@@ -107,13 +158,20 @@ export function buildLearningRun(config, report, assessment, usage, plan, snapsh
   assert(plan.repo_root === report.source_repo && snapshot.repo_root === report.source_repo, 'Run source provenance mismatch');
   assert(Array.isArray(usage.requests), 'Missing usage ledger');
   const key = digest([config.project_id, report.run_id, report.created_at]);
+  // Keep the legacy profile byte shape and digest for schema-1 assessments.
+  // Evaluation/assessment v2 records get an explicit profile version so a
+  // dated catalog alias target can be separated from older alias-era history.
+  const profileV2 = assessment.schema_version === 2;
+  const modelIdentity = (model, spec) => profileV2
+    ? model.catalog_alias_target?.canonical_slug || model.catalog_alias_target?.slug || model.canonical_slug || model.resolved_model || spec.model
+    : model.catalog_alias_target?.slug || model.canonical_slug || model.resolved_model || spec.model;
   // Incremental value can depend on companion workers. Do not pool changed ensembles.
   const team = report.agents.map(a => {
     const spec = plan.agents.find(w => w.id === a.id); assert(spec, 'Worker is absent from saved plan');
     const m = a.model || {};
     return { role: l.workers.find(w => w.agent_id === a.id).role,
       provider: m.provider || spec.provider || plan.policy.preferred_provider,
-      model_identity: m.catalog_alias_target?.slug || m.canonical_slug || m.resolved_model || spec.model,
+      model_identity: modelIdentity(m, spec),
       effective_effort: m.effective_pi_effort || 'unknown', mode: a.mode,
       runtime_limits: a.limits || runtimeLimits(workerPolicy(plan.policy || {}, spec.limits), m.max_output_tokens) };
   }).sort((a,b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
@@ -127,11 +185,12 @@ export function buildLearningRun(config, report, assessment, usage, plan, snapsh
     const mismatch = modelIds.some(id => !expected.has(id)) || a.status === 'model_mismatch';
     assert(evaluation.outcome !== 'useful' || !mismatch, 'A model identity mismatch cannot support a useful routing preference');
     const profile = {
+      ...(profileV2 ? { profile_schema_version: PROFILE_SCHEMA_VERSION } : {}),
       host, host_model: report.orchestrator_model || 'unknown', host_version: report.orchestrator_version || 'unknown',
       task_type: l.task_type, scope: l.scope, complexity: l.complexity, strategy: l.strategy, strategy_version: l.strategy_version, role: evaluation.role,
       provider: m.provider || spec.provider || plan.policy.preferred_provider,
       requested_model: m.requested_model || spec.model, resolved_model: m.resolved_model || spec.model,
-      model_identity: m.catalog_alias_target?.slug || m.canonical_slug || m.resolved_model || spec.model,
+      model_identity: modelIdentity(m, spec),
       observed_models: modelIds, upstream_providers: [...new Set(requests.map(r => r.upstream_provider).filter(Boolean))].sort(),
       requested_effort: m.requested_effort || spec.effort, effective_effort: m.effective_pi_effort || 'unknown', mode: a.mode,
       // A short allocation can make a capable model look bad. Trials run under different
@@ -139,7 +198,7 @@ export function buildLearningRun(config, report, assessment, usage, plan, snapsh
       runtime_limits: a.limits || runtimeLimits(workerPolicy(plan.policy || {}, spec.limits), m.max_output_tokens),
       team, skill_version: report.skill_version || 'legacy', sdk_version: report.sdk_version_target || 'unknown'
     };
-    return { profile, profile_id: digest(profile).slice(0, 16), agent_id: a.id, task_id: l.task_id,
+    const observation = { profile, profile_id: digest(profile).slice(0, 16), agent_id: a.id, task_id: l.task_id,
       at: report.finished_at, status: a.status, usefulness: score.usefulness_0_to_3,
       outcome: evaluation.outcome, validation: evaluation.validation, failure_kind: evaluation.failure_kind,
       regression: evaluation.regression, rework: evaluation.rework, evidence_sha256: digest(evaluation.evidence),
@@ -147,6 +206,25 @@ export function buildLearningRun(config, report, assessment, usage, plan, snapsh
       stop_diagnostic: a.stop_diagnostic || null, failure_class: a.failure_class ?? null,
       recovery_events: a.recovery_events || [], limit_usage: a.limit_usage || null,
       elapsed_seconds: isNumber(a.elapsed_seconds) ? a.elapsed_seconds : null, costs: costSummary(requests) };
+    if (profileV2) {
+      const planned = report.evaluation?.workers?.find(worker => worker.agent_id === a.id);
+      assert(planned, `Missing v2 evaluation assignment for ${a.id}`);
+      const criterionResults = score.criterion_results || [];
+      observation.evaluation_metadata = {
+        schema_version: 2,
+        focus: [...(report.evaluation.focus || [])],
+        assignment_id: planned.assignment_id,
+        attempt_index: planned.attempt_index,
+        criteria: planned.criteria.map(criterion => {
+          const result = criterionResults.find(item => item.id === criterion.id);
+          return { id: criterion.id, result: result?.result || 'not_run', evidence_count: result?.evidence?.length || 0 };
+        }),
+        quality_0_to_3: score.quality_0_to_3,
+        artifact_sha256: score.artifact_sha256,
+        integration_status: score.integration_status
+      };
+    }
+    return observation;
   });
   return { key, project_id: config.project_id, run_id: report.run_id, created_at: report.created_at, task_id: l.task_id,
     assessed_by: assessment.assessed_by, artifact_hashes: { report: digest(report), assessment: digest(assessment), usage: digest(usage), plan: digest(plan), snapshot: digest(snapshot) }, observations };
@@ -156,6 +234,17 @@ export function recordLearning(repo, out, assessmentPath, { revise = false } = {
   assert(!inside(root, runDir), 'Run artifacts must be outside the task repository');
   const report = loadJson(runDir, 'report.json'), usage = loadJson(runDir, 'usage.json'), plan = loadJson(runDir, 'plan.json'), snapshot = loadJson(runDir, 'snapshot.json');
   assert(report && projectRoot(report.source_repo) === root, 'Run belongs to a different project');
+  assert(evaluationsMatch(report.evaluation, plan.evaluation), 'Saved report evaluation differs from the preregistered plan evaluation');
+  // V2 quality is anchored to the bytes actually saved by the runner.  Older
+  // synthetic fixtures and legacy runs may not have worker result files, so
+  // preserve their compatible validation path rather than inventing a digest.
+  for (const agent of report.agents || []) {
+    assert(typeof agent.id === 'string' && /^[a-z][a-z0-9._-]{0,63}$/.test(agent.id), 'Report worker ID is not a safe artifact directory name');
+    delete agent.artifact_identity;
+    if (fs.existsSync(path.join(runDir, agent.id, 'result.json'))) {
+      agent.artifact_identity = readArtifactIdentity(runDir, agent.id, { plan, snapshot });
+    }
+  }
   const assessment = assessmentPath ? loadJson(projectRoot(path.dirname(path.resolve(assessmentPath))), path.basename(assessmentPath)) : loadJson(runDir, 'assessment.json');
   return withLock(root, () => {
     const config = configOf(root); assert(config.mode !== 'off', 'Project learning is off');
@@ -198,7 +287,7 @@ export function aggregateLearning(history, config, now = Date.now()) {
     if (usefulTasks < config.min_distinct_tasks) reasons.push('insufficient_distinct_validated_tasks');
     if (fraction < config.min_useful_fraction) reasons.push('insufficient_useful_fraction');
     if (harmfulTasks) reasons.push('contradictory_or_regression_evidence');
-    return { profile_id: g.profile_id, profile: g.profile, attempts: observations.length, distinct_tasks: tasks.length, quality_evaluated_tasks: qualityTasks,
+    return { profile_id: g.profile_id, profile_schema_version: g.profile.profile_schema_version || 1, profile: g.profile, attempts: observations.length, distinct_tasks: tasks.length, quality_evaluated_tasks: qualityTasks,
       useful_tasks: usefulTasks, harmful_tasks: harmfulTasks, useful_fraction: fraction,
       operational_failures: observations.filter(o => ['provider','packet','host','limit','unknown'].includes(o.failure_kind)).length,
       mean_usefulness: observations.reduce((sum,o) => sum + o.usefulness,0) / observations.length,
@@ -216,6 +305,20 @@ export function learningSummary(repo, now = Date.now()) {
   if (!raw) return { initialized: false, profiles: [], note: 'No project learning has been enabled.' };
   const config = validateLearningConfig(raw);
   return { initialized: true, mode: config.mode, ...aggregateLearning(historyOf(root, config), config, now) };
+}
+/** Read-only project/run lifecycle status; never initializes or rewrites state. */
+export function learningStatus(repo, out = null) {
+  const root = projectRoot(repo), raw = loadJson(root, CONFIG);
+  if (!raw) return { initialized: false, mode: null, inventory: null, run: null, note: 'No project learning has been enabled.' };
+  const config = validateLearningConfig(raw), inventory = readRunInventory(root);
+  let run = null;
+  if (out) {
+    const runDir = projectRoot(out), receipt = loadJson(runDir, 'finalization.json');
+    const report = loadJson(runDir, 'report.json');
+    assert(report?.source_repo && projectRoot(report.source_repo) === root, 'Run belongs to a different project');
+    run = { run_id: report.run_id, receipt, inventory: inventory?.runs.find(item => item.run_id === report.run_id) || null };
+  }
+  return { initialized: true, mode: config.mode, project_id: config.project_id, inventory, run, note: 'Read-only status; no files were written.' };
 }
 export function replaceLearnedBlock(value, block) {
   const rows = plainLines(value), starts = rows.filter(x => x.line === START), ends = rows.filter(x => x.line === END);
@@ -298,18 +401,19 @@ function parseArgs(args) {
     if (flags.has(k)) o[k] = true;
     else { assert(args[i+1] && !args[i+1].startsWith('--'), `Missing value for ${args[i]}`); o[k] = args[++i]; }
   }
-  const allowed = { help: [], init: ['repo','mode','claude-import'], mode: ['repo','mode'], record: ['repo','out','assessment','revise'], summary: ['repo'], propose: ['repo','profiles'], apply: ['repo','reviewed-by','approve'] };
+  const allowed = { help: [], init: ['repo','mode','claude-import'], mode: ['repo','mode'], status: ['repo','out'], record: ['repo','out','assessment','revise'], summary: ['repo'], propose: ['repo','profiles'], apply: ['repo','reviewed-by','approve'] };
   assert(Object.hasOwn(allowed,command), `Unknown learn command: ${command}`);
   for (const k of Object.keys(o)) assert(allowed[command].includes(k), `--${k} is not used by learn ${command}`);
   return { command, o };
 }
 export function learningMain(args) {
   const { command, o } = parseArgs(args);
-  if (command === 'help') { console.log('pi learn (local, no inference)\n  init --repo ROOT [--mode propose|auto|off] [--claude-import]\n  mode --repo ROOT --mode propose|auto|off\n  record --repo ROOT --out RUN [--assessment FILE] [--revise]\n  summary --repo ROOT\n  propose --repo ROOT [--profiles ID,ID | --profiles none]\n  apply --repo ROOT --reviewed-by codex|claude-code [--approve]\n\nNo AGENTS.md edits during record/propose. apply needs a fresh, host-reviewed proposal. Propose mode also needs --approve. Auto is local opt-in, not unattended execution.'); return; }
+  if (command === 'help') { console.log('pi learn (local, no inference)\n  init --repo ROOT [--mode propose|auto|off] [--claude-import]\n  mode --repo ROOT --mode propose|auto|off\n  status --repo ROOT [--out RUN]\n  record --repo ROOT --out RUN [--assessment FILE] [--revise]\n  summary --repo ROOT\n  propose --repo ROOT [--profiles ID,ID | --profiles none]\n  apply --repo ROOT --reviewed-by codex|claude-code [--approve]\n\nNo AGENTS.md edits during record/propose. apply needs a fresh, host-reviewed proposal. Propose mode also needs --approve. Auto is local opt-in, not unattended execution.'); return; }
   assert(o.repo, '--repo is required'); let result;
   if (command === 'init') result = initLearning(o.repo, { mode: o.mode || 'propose', claudeImport: Boolean(o['claude-import']) });
   if (command === 'mode') result = setLearningMode(o.repo, o.mode);
   if (command === 'record') { assert(o.out, '--out is required'); result = recordLearning(o.repo, o.out, o.assessment, { revise: Boolean(o.revise) }); }
+  if (command === 'status') result = learningStatus(o.repo, o.out);
   if (command === 'summary') result = learningSummary(o.repo);
   if (command === 'propose') result = proposeLearning(o.repo, { profiles: o.profiles === 'none' ? [] : o.profiles ? o.profiles.split(',') : null });
   if (command === 'apply') result = applyLearning(o.repo, { reviewedBy: o['reviewed-by'], approve: Boolean(o.approve) });

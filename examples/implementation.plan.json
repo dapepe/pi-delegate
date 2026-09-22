@@ -28,7 +28,7 @@
   "agents": [
     {
       "id": "implementer",
-      "role": "candidate implementer",
+      "role": "sparring-partner",
       "model": "deepseek/deepseek-v4-pro",
       "mode": "write",
       "write_files": [
@@ -42,7 +42,7 @@
     },
     {
       "id": "criteria-review",
-      "role": "correctness reviewer",
+      "role": "sparring-partner",
       "model": "google/gemini-3.8-flash",
       "mode": "read",
       "write_files": [],

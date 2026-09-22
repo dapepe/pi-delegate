@@ -2,7 +2,9 @@
 
 **Yes to evidence-backed routing preferences; no to self-reinforcing agent folklore.**
 
-This feature helps the current host choose a useful strategy/model combination for a similar future task. It does not train model weights, prove a globally best model, upload feedback, run a reflection model, or spend on automatic experiments. Codex and Claude Code remain the sole reviewers and integration decision makers. The local helper aggregates **host-authored assessments**, not workers' opinions of themselves.
+This feature helps the current host inspect delegation quality, usefulness, reliability and spending for a similar future task. It does not train model weights, prove a globally best model, upload feedback, run a reflection model, or spend on automatic experiments. Codex and Claude Code remain the sole reviewers and integration decision makers. The local helper aggregates **host-authored assessments**, not workers' opinions of themselves.
+
+Pi 1.5.0 adds a small evaluation contract to plans and a durable run inventory. A plan may name a question or decision through its objective/context, scope, stable task ID, focus labels and criteria for each assignment. The default worker role is `sparring-partner`; older role identifiers remain readable. Use the six suggested focus labels (`correctness`, `completeness`, `security`, `maintainability`, `design`, `planning`) or bounded custom tags. Focus labels organize evidence; they do not require disagreement or a finding quota.
 
 ## Enable it deliberately
 
@@ -37,11 +39,12 @@ The local directory is created with an internal `.gitignore` that ignores its co
 ```text
 .pi/learning/config.json           project identity, mode, evidence limits
 .pi/learning/history.json          observations, costs, artifact hashes, revisions
+.pi/learning/runs.json             sanitized inventory of every recorded attempt
 .pi/learning/proposal.json         exact proposed block and source hashes
 .pi/learning/last-promotion.json    last host attestation and before/after hashes
 ```
 
-Raw run artifacts remain outside the task repository. The history does not store full worker transcripts, source snippets, free-form reflections, or validation-evidence text. It stores sanitized task IDs/scope, model/host metadata, numeric outcomes and costs, plus evidence digests/counts. Task IDs, paths and metadata can still be sensitive; choose non-sensitive identifiers. Ignoring files is not encryption, access control, or protection against `git add -f`. The helper never uploads history.
+Raw run artifacts remain outside the task repository. The history does not store full worker transcripts, source snippets, free-form reflections, or validation-evidence text. It stores sanitized task IDs/scope, model/host metadata, numeric outcomes and costs, plus evidence digests/counts. `runs.json` is a separate compact inventory for coverage and spending; it may contain project identity, run/assignment IDs, status, assessment state, cost buckets and preregistered criterion IDs, but never criterion requirement text or a raw `run_path`. Task IDs, paths and metadata can still be sensitive; choose non-sensitive identifiers. Ignoring files is not encryption, access control, or protection against `git add -f`. The helper never uploads history or sends global telemetry.
 
 Only a compact reviewed block is suitable for sharing in `AGENTS.md`. Default limits are **six profiles maximum and 4,096 bytes total**, often fewer profiles when ensemble descriptions are long. The updater preserves all human content outside these exact standalone markers:
 
@@ -54,11 +57,13 @@ Do not insert marker examples into the real project's `AGENTS.md`: fenced or dup
 
 ## What constitutes evidence
 
-After reviewing each worker and independently validating its claims, the host writes a normal assessment plus a `learning` object. Start from [the template](../templates/learning-assessment.example.json), replacing every example identifier and outcome. Every worker needs an evaluation, including failures and skipped workers.
+After reviewing each worker and independently validating its claims, the host writes a normal assessment plus a `learning` object. Start from [the template](../templates/learning-assessment.example.json), replacing every example identifier and outcome. Every worker needs an evaluation, including failures and skipped workers. Schema 2 adds a separate quality grade, criterion results and original artifact identity; schema 1 remains readable for older runs.
 
 Use the **same `task_id` for retries and phases of the same real task**. A new filename, run ID, worker, host, or session is not a new task. `task_type`, `scope`, and `complexity` describe the actual work. `strategy_version` identifies the host's task-packet/process recipe; increment it when that recipe materially changes, not after every result.
 
-The recorded profile separates host and known host-model/version, task class/scope/complexity, strategy/version, normalized role, complete same-plan worker team, requested/resolved/observed model identity, upstream provider, requested/effective effort, read versus candidate-write permission, runtime allocations (including companion-worker allocations and the effective output allowance), and skill/SDK versions. A changed ensemble or resolved moving-alias target is not pooled with the old configuration. Unknown host identity is recorded as unknown, never invented; assess unknown-version history conservatively and reset the strategy version when the effective host changes.
+The recorded profile separates host and known host-model/version, task class/scope/complexity, strategy/version, focus tags, default or legacy role, complete same-plan worker team, assignment and attempt identity, requested/resolved/observed model identity, upstream provider, requested/effective effort, read versus candidate-write permission, runtime allocations (including companion-worker allocations and the effective output allowance), and skill/SDK versions. Suggested task types are useful filters, but a bounded lowercase custom type is allowed when the work does not fit them. A changed ensemble or resolved moving-alias target is not pooled with the old configuration. Unknown host identity is recorded as unknown, never invented; assess unknown-version history conservatively and reset the strategy version when the effective host changes.
+
+Schema-2 assessments create new `evaluation_metadata` records and `profile_schema_version: 2` profiles. Versioned catalog-alias identities in those profiles remain separate from older schema-1 alias-era profiles; existing history is not rewritten or silently pooled during this additive update.
 
 Supported strategy labels:
 
@@ -71,9 +76,9 @@ Supported strategy labels:
 | `design-challenge` | Focused challenge to a proposed design |
 | `edge-case-review` | Targeted edge-case/test investigation |
 
-Normalized roles are `scout`, `candidate`, `correctness-review`, `test-review`, and `design-challenger`. These describe work, not assumed model specialties. A plan's descriptive `role` may be more detailed; the host supplies the normalized learning role. For phased work, the team field describes the **current plan**, not an invented record of earlier/later phases. Use a consistent strategy version to identify the broader recipe and assess all phase costs separately.
+New plans use one default role, `sparring-partner`, and let the assignment and focus tags describe the angle. Historical normalized roles (`scout`, `candidate`, `correctness-review`, `test-review`, and `design-challenger`) remain readable so existing records do not change meaning. For phased work, the team field describes the **current plan**, not an invented record of earlier/later phases. Use a consistent strategy version to identify the broader recipe and assess all phase costs separately.
 
-A useful observation requires a completed worker, captured request/resolved model-effort metadata, host usefulness score at least 2/3, independently passed validation with evidence references, no policy violation/identity mismatch, no observed regression, and no major or unknown rework. A clean review may score 1 for useful assurance without becoming a routing win. Proposed tests alone do not establish passed validation. Negative quality claims also require host evidence.
+A useful observation requires a completed worker, captured request/resolved model-effort metadata, host usefulness score at least 2/3, independently passed validation with evidence references, no policy violation/identity mismatch, no observed regression, and no major or unknown rework. In schema 2, a positive quality outcome also needs a non-null quality grade, passed or appropriately inconclusive criteria, and the artifact identity checked when a candidate or submission exists. A clean review may score high quality and usefulness 1 for useful assurance without becoming a routing win. Proposed tests alone do not establish passed validation. Negative quality claims also require host evidence. A host repair or later rewrite never raises the original worker's quality grade.
 
 Use `failure_kind` to distinguish model-quality failures from provider outages, inadequate packets, host mistakes or unknown causes. `failure_kind: "limit"` records an established time, request, tool, context or budget-admission failure as operational, not as a negative reasoning verdict. The stop diagnostic, actual allowance usage and completion-repair metadata are retained in the observation. Do not infer a cause from an unfinished artifact alone, and do not promote an incomplete assignment as a completed success even when some partial findings were useful. Operational failures stay visible with their costs; they are not silently counted as incorrect model answers. They should still influence the host's practical reliability judgment. Confirmed regressions veto a positive preference.
 
@@ -83,22 +88,25 @@ A profile becomes eligible only after **at least three distinct useful tasks**, 
 
 These are deliberately small, conservative **policy heuristics, not statistical confidence guarantees**. Selection bias, task difficulty, host skill, unobserved rework and tiny samples still matter. Do not infer a causal comparison or replace a reviewer because one profile passed the floor. Route justified real tasks to alternatives within the existing authorization; never create extra paid work merely to improve a score.
 
-The summary reports counts, mean usefulness, median elapsed time, operational failures, provider-reported charges, unreconciled estimates and unknown requests. It does not turn these into a universal scalar quality/price ranking. Host execution cost and time are not measured. Reported per-worker or per-plan amounts are not complete end-to-end workflow costs.
+The learning summary reports task-balanced counts and quality/usefulness evidence. The separate [insights workflow](insights.md) reports every recorded attempt, including unassessed, failed, rejected and retried work, with provider-reported charges, unreconciled estimates and unknown requests. It does not turn these into a universal scalar quality/price ranking. Host execution cost and time are not measured. Reported per-worker or per-plan amounts are not complete end-to-end workflow costs.
 
 Thresholds can be made stricter in the local config. The schema refuses fewer than three useful tasks, a useful fraction below 0.75, more than six rules, or a block above 4,096 bytes. A host still decides which **eligible** profiles are worth publishing; eligibility alone is not a decision.
 
-## Record → review → propose → apply
+## Record → review → finalize → propose → apply
 
 After an actual run, complete integration checks and reconcile available costs. Then:
 
 ```sh
 node scripts/pi.mjs learn record --repo /absolute/project/root --out /private/run \
   --assessment /private/run/assessment.json
+node scripts/pi.mjs finalize --repo /absolute/project/root --out /private/run \
+  --assessment /private/run/assessment.json
 node scripts/pi.mjs learn summary --repo /absolute/project/root
+node scripts/pi.mjs learn status --repo /absolute/project/root
 node scripts/pi.mjs learn propose --repo /absolute/project/root
 ```
 
-All three leave `AGENTS.md` untouched. `propose` suggests the most-supported eligible profiles that fit the size limit; this is draft selection, not a global ranking. To control selection, pass `--profiles ID,ID`, using IDs from the current summary. `--profiles none` deliberately clears all promoted preferences while leaving a small advisory block.
+`record`, `finalize`, `summary`, `status` and `propose` leave `AGENTS.md` untouched. `finalize` is a local receipt/status transition: it validates the named run and optional assessment, updates the durable run inventory, and, when learning is initialized, enabled and the assessment is valid, records the run automatically. An ordinary finalize can close an assessed run while recording failed or incomplete workers for review; add `--require-complete` when every worker must be complete. Invalid assessment input fails closed without replacing a previous valid receipt. It reports the remaining action. It does not run tests, invoke inference, apply a candidate or promote a preference. If the project is uninitialized or mode is `off`, the receipt says recording was skipped and gives the host the explicit next action. `propose` suggests the most-supported eligible profiles that fit the size limit; this is draft selection, not a global ranking. To control selection, pass `--profiles ID,ID`, using IDs from the current summary. `--profiles none` deliberately clears all promoted preferences while leaving a small advisory block.
 
 The host must inspect the candidate block and evidence before applying. In `propose` mode, after user approval:
 

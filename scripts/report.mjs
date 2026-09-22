@@ -3,9 +3,14 @@ import { assert, text, isNumber, hostLabel } from './lib.mjs';
 import { explainStop } from './runtime.mjs';
 const cell = value => String(value ?? 'unknown').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('|', '\\|').replace(/[\r\n]+/g, ' ').replace(/[\x00-\x1f\x7f]/g, '');
 const money = n => isNumber(n) ? `$${n.toFixed(6)}` : 'unknown';
+const HEX64 = /^[a-f0-9]{64}$/;
+const CRITERION_RESULTS = new Set(['passed', 'failed', 'inconclusive', 'not_run']);
+const INTEGRATION_STATUSES = new Set(['not_assessed', 'not_applicable', 'candidate_only', 'accepted_modified', 'accepted_unmodified', 'rejected', 'deferred', 'unknown']);
 export function validateAssessment(input, report) {
   const host = hostLabel(report.orchestrator);
   assert(input && input.run_id === report.run_id && input.assessed_by === host, `Assessment must identify this run and ${host} as the assessor`);
+  const schemaVersion = input.schema_version ?? 1;
+  assert(schemaVersion === 1 || schemaVersion === 2, `Unsupported assessment schema_version: ${schemaVersion}`);
   text(input.overall_value, 'overall_value', 8000);
   assert(Array.isArray(input.workers) && input.workers.length === report.agents.length, 'Assess every worker, including failures and skipped workers');
   assert(Array.isArray(input.decisions) && input.decisions.length <= 1000, 'decisions must be a bounded array');
@@ -15,7 +20,39 @@ export function validateAssessment(input, report) {
     assert(Number.isInteger(w.usefulness_0_to_3) && w.usefulness_0_to_3 >= 0 && w.usefulness_0_to_3 <= 3, 'Usefulness must be 0–3');
     text(w.reason, 'worker assessment reason', 8000);
     for (const k of ['unique_validated_findings', 'duplicate_findings', 'unverified_findings']) if (w[k] !== undefined) assert(Number.isInteger(w[k]) && w[k] >= 0, `${k} must be a nonnegative integer`);
+    if (schemaVersion === 2) {
+      for (const key of Object.keys(w)) assert(['agent_id', 'usefulness_0_to_3', 'reason', 'unique_validated_findings', 'duplicate_findings', 'unverified_findings', 'quality_0_to_3', 'quality_reason', 'criterion_results', 'artifact_sha256', 'integration_status'].includes(key), `Unknown assessment v2 worker field: ${key}`);
+      assert(Object.hasOwn(w, 'quality_0_to_3'), 'Assessment v2 workers must include quality_0_to_3 (or null)');
+      assert(w.quality_0_to_3 === null || (Number.isInteger(w.quality_0_to_3) && w.quality_0_to_3 >= 0 && w.quality_0_to_3 <= 3), 'quality_0_to_3 must be 0–3 or null');
+      text(w.quality_reason, 'quality_reason', 4000);
+      assert(Array.isArray(w.criterion_results) && w.criterion_results.length <= 8, 'criterion_results must be an array with at most 8 items');
+      const ids = new Set();
+      for (const criterion of w.criterion_results) {
+        assert(criterion && typeof criterion === 'object' && !Array.isArray(criterion), 'Each criterion result must be an object');
+        for (const key of Object.keys(criterion)) assert(['id', 'result', 'evidence'].includes(key), `Unknown criterion result field: ${key}`);
+        text(criterion.id, 'criterion result id', 64); assert(!ids.has(criterion.id), 'Duplicate criterion result id'); ids.add(criterion.id);
+        assert(CRITERION_RESULTS.has(criterion.result), 'Invalid criterion result');
+        assert(Array.isArray(criterion.evidence) && criterion.evidence.length <= 4 && criterion.evidence.every(e => typeof e === 'string' && e.trim() && e.length <= 1200), 'Criterion evidence must be a bounded string array');
+        if (criterion.result === 'passed' || criterion.result === 'failed') assert(criterion.evidence.length > 0, 'Passed/failed criteria need evidence');
+      }
+      assert(w.artifact_sha256 === null || (typeof w.artifact_sha256 === 'string' && HEX64.test(w.artifact_sha256)), 'artifact_sha256 must be a SHA-256 hex string or null');
+      assert(typeof w.integration_status === 'string' && INTEGRATION_STATUSES.has(w.integration_status), 'Invalid integration_status');
+      const agent = report.agents.find(a => a.id === w.agent_id);
+      const expected = report.evaluation?.workers?.find(item => item.agent_id === w.agent_id)?.criteria || [];
+      assert(report.evaluation && expected.length > 0, 'Assessment v2 requires the preregistered plan evaluation and criteria');
+      const expectedIds = new Set(expected.map(item => item.id));
+      assert(w.criterion_results.length === expectedIds.size, 'Assessment v2 must report every preregistered criterion exactly once');
+      for (const criterion of w.criterion_results) assert(expectedIds.has(criterion.id), `Criterion result is not in the plan evaluation: ${criterion.id}`);
+      assert(new Set(w.criterion_results.map(criterion => criterion.id)).size === expectedIds.size, 'Assessment v2 criterion coverage is incomplete or duplicated');
+      if (w.quality_0_to_3 !== null) {
+        assert(agent.artifact_identity?.artifact_sha256, 'A numeric quality grade requires an actual saved submission/candidate artifact identity');
+        assert(w.artifact_sha256 !== null, 'A numeric quality grade must identify the original submission/candidate artifact');
+        assert(w.criterion_results.some(criterion => ['passed', 'failed'].includes(criterion.result) && criterion.evidence.length > 0), 'A numeric quality grade needs meaningful passed/failed criterion evidence');
+        assert(w.artifact_sha256 === agent.artifact_identity.artifact_sha256, 'Assessment artifact_sha256 does not match the saved worker artifact');
+      }
+    }
   }
+  assert(seen.size === report.agents.length, 'Assess every worker, including failures and skipped workers');
   const decisions = new Set();
   for (const d of input.decisions) {
     const agent = report.agents.find(a => a.id === d.agent_id);
@@ -28,7 +65,7 @@ export function validateAssessment(input, report) {
   }
   // Every submitted finding must be dispositioned; a clean review can still score 1.
   for (const a of report.agents) for (const f of a.submission?.findings || []) assert(decisions.has(`${a.id}:${f.id}`), 'Every submitted finding needs an explicit decision, including defer');
-  return structuredClone(input);
+  return structuredClone({ ...input, ...(input.schema_version === undefined ? {} : { schema_version: schemaVersion }) });
 }
 /**
  * Sum several run ledgers — the phases of one task — into one labelled total. Each run keeps
@@ -72,7 +109,8 @@ export function markdownReport(report, assessment = null) {
     '| --- | --- | --- | --- | --- | --- | --- |'];
   for (const a of report.agents) {
     const w = assessment?.workers.find(w => w.agent_id === a.id), m=a.model || {}, cost=a.costs || {};
-    lines.push(`| ${cell(a.id)} / ${cell(a.role)} | ${cell(m.resolved_model || m.requested_model)} / ${cell(m.provider)} | ${cell(a.mode)} | ${cell(m.requested_effort)} → ${cell(m.effective_pi_effort)} | ${cell(a.status)} / ${cell(a.elapsed_seconds)} | ${money(cost.provider_reported_usd)} / ${money(cost.estimated_unreconciled_usd)} | ${w ? `${w.usefulness_0_to_3}/3 — ${cell(w.reason)}` : `Not assessed by ${host}`} |`);
+    const assessed = w ? `${w.usefulness_0_to_3}/3 — ${cell(w.reason)}${assessment?.schema_version === 2 ? `; quality ${w.quality_0_to_3 === null ? 'unknown' : `${w.quality_0_to_3}/3`}` : ''}` : `Not assessed by ${host}`;
+    lines.push(`| ${cell(a.id)} / ${cell(a.role)} | ${cell(m.resolved_model || m.requested_model)} / ${cell(m.provider)} | ${cell(a.mode)} | ${cell(m.requested_effort)} → ${cell(m.effective_pi_effort)} | ${cell(a.status)} / ${cell(a.elapsed_seconds)} | ${money(cost.provider_reported_usd)} / ${money(cost.estimated_unreconciled_usd)} | ${assessed} |`);
   }
   lines.push('', '## Findings and decisions', '');
   for (const a of report.agents) {

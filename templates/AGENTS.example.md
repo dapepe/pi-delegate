@@ -1,6 +1,6 @@
 ## pi
 
-The current primary host (Codex or Claude Code) is the sole orchestrator and integration decision maker. It may delegate bounded work to Pi when the expected value justifies the cost and the user/workspace policy permits the required external data transfer. Read-only is the default. Candidate-write permission requires an explicit file list; the main checkout is never writable by a Pi worker. The host decides which findings/edits to accept, validates them, and reports usefulness and cost.
+The current primary host (Codex or Claude Code) is the sole orchestrator and integration decision maker. It may delegate bounded work to Pi when the expected value justifies the cost and the user/workspace policy permits the required external data transfer. Read-only is the default. Candidate-write permission requires an explicit file list; the main checkout is never writable by a Pi worker. The host decides which findings/edits to accept, validates them, and reports quality, usefulness and cost.
 
 Use the following preferences when compiling the `pi` run plan. The JSON is a policy override for this skill, not native Pi or native host configuration. The host must copy the resolved settings into the plan's `policy`; the helper does not parse this Markdown.
 
@@ -45,7 +45,7 @@ Request xhigh for nontrivial tasks and max for especially complex/high-consequen
 
 `max_turns` counts provider requests, including tool iterations and completion repairs. Finalization reserves part of the existing allowance rather than adding quota. Match the enclosing host-command lifetime to the authorized work; inspect `diagnose` output and partial checkpoints rather than restarting blindly. A larger task allocation needs explicit policy authorization; a per-worker `limits` object may only reduce a plan ceiling.
 
-Independent reviewers must not see each other's conclusions before their first pass. Resolve differences through evidence/tests. Report accepted, rejected and deferred recommendations; distinguish provider-reported charges, estimates and unknown cost. The host should supply a brief usefulness rating with its reason after validation.
+Use one default independent `sparring-partner` assignment unless a different role is needed for compatibility with an older plan. Describe the question or decision, source scope, context and constraints, expected contribution, success evidence and known uncertainty in the task packet. Optionally tag the assignment with `correctness`, `completeness`, `security`, `maintainability`, `design` or `planning`, plus bounded custom tags. Do not require disagreement or a finding quota. Independent reviewers must not see each other's conclusions before their first pass. Resolve differences through evidence/tests. Report accepted, rejected and deferred recommendations; distinguish provider-reported charges, estimates and unknown cost. The host should supply separate quality (0–3 or unknown) and usefulness (0–3) judgments after validation.
 
 ### Project-learning policy
 
