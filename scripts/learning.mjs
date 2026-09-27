@@ -5,6 +5,7 @@ import crypto from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 import { assert, text, cleanRel, sha256, hostLabel, costSummary, isNumber, inside, authorizedIdentities, workerPolicy } from './lib.mjs';
 import { runtimeLimits } from './runtime.mjs';
+import { compatibleConfigurationFingerprint } from './compatible.mjs';
 import { validateAssessment } from './report.mjs';
 import { evaluationsMatch, readArtifactIdentity } from './evaluation.mjs';
 import { readRunInventory } from './insights-store.mjs';
@@ -29,6 +30,11 @@ const V2_RESULTS = new Set(['passed', 'failed', 'inconclusive', 'not_run']);
 const V2_INTEGRATION = new Set(['not_assessed', 'not_applicable', 'candidate_only', 'accepted_modified', 'accepted_unmodified', 'rejected', 'deferred', 'unknown']);
 const slug = (value, label) => { text(value, label, 120); assert(/^[a-z0-9][a-z0-9_.-]*$/.test(value), `${label} must be a lowercase non-sensitive identifier`); return value; };
 const digest = value => sha256(JSON.stringify(value));
+function validateCompatibleIdentity(profile) {
+  for (const entry of [profile, ...(profile?.team || [])]) if (entry?.provider?.startsWith('compatible:')) {
+    assert(typeof entry.configuration_fingerprint === 'string' && /^[a-f0-9]{64}$/.test(entry.configuration_fingerprint), 'Compatible learning requires a valid configuration fingerprint; unbound legacy evidence cannot be promoted');
+  }
+}
 // Only identifier-like rendered data enters AGENTS.md. No free-form worker or reflection text is imported.
 const inline = value => String(value ?? 'unknown').replace(/[^A-Za-z0-9_./:~+ -]/g, c => encodeURIComponent(c)).slice(0, 180);
 export function validateLearningConfig(config) {
@@ -48,6 +54,7 @@ function historyOf(root, config) {
   for (const run of history.runs) {
     assert(run && run.current && run.current.project_id === config.project_id && run.key === run.current.key && Array.isArray(run.current.observations), 'Invalid history run');
     for (const observation of run.current.observations) {
+      validateCompatibleIdentity(observation.profile);
       if (observation.evaluation_metadata !== undefined) validateEvaluationMetadata(observation.evaluation_metadata);
       if (observation.profile?.profile_schema_version !== undefined) {
         assert(observation.profile.profile_schema_version === PROFILE_SCHEMA_VERSION, 'Unsupported learning profile schema version');
@@ -164,6 +171,13 @@ export function buildLearningRun(config, report, assessment, usage, plan, snapsh
   // Evaluation/assessment v2 records get an explicit profile version so a
   // dated catalog alias target can be separated from older alias-era history.
   const profileV2 = assessment.schema_version === 2;
+  const compatibleIdentity = (model, spec) => {
+    const provider = model.provider || spec.provider || plan.policy.preferred_provider;
+    if (!provider.startsWith('compatible:')) return {};
+    validateCompatibleIdentity({ provider, configuration_fingerprint: model.configuration_fingerprint });
+    assert(model.configuration_fingerprint === compatibleConfigurationFingerprint(plan.policy, provider, spec.model), 'Compatible report fingerprint differs from its saved approved configuration');
+    return { configuration_fingerprint: model.configuration_fingerprint };
+  };
   const modelIdentity = (model, spec) => profileV2
     ? model.catalog_alias_target?.canonical_slug || model.catalog_alias_target?.slug || model.canonical_slug || model.resolved_model || spec.model
     : model.catalog_alias_target?.slug || model.canonical_slug || model.resolved_model || spec.model;
@@ -173,6 +187,7 @@ export function buildLearningRun(config, report, assessment, usage, plan, snapsh
     const m = a.model || {};
     return { role: l.workers.find(w => w.agent_id === a.id).role,
       provider: m.provider || spec.provider || plan.policy.preferred_provider,
+      ...compatibleIdentity(m, spec),
       model_identity: modelIdentity(m, spec),
       effective_effort: m.effective_pi_effort || 'unknown', mode: a.mode,
       runtime_limits: a.limits || runtimeLimits(workerPolicy(plan.policy || {}, spec.limits), m.max_output_tokens) };
@@ -191,6 +206,7 @@ export function buildLearningRun(config, report, assessment, usage, plan, snapsh
       host, host_model: report.orchestrator_model || 'unknown', host_version: report.orchestrator_version || 'unknown',
       task_type: l.task_type, scope: l.scope, complexity: l.complexity, strategy: l.strategy, strategy_version: l.strategy_version, role: evaluation.role,
       provider: m.provider || spec.provider || plan.policy.preferred_provider,
+      ...compatibleIdentity(m, spec),
       requested_model: m.requested_model || spec.model, resolved_model: m.resolved_model || spec.model,
       model_identity: modelIdentity(m, spec),
       observed_models: modelIds, upstream_providers: [...new Set(requests.map(r => r.upstream_provider).filter(Boolean))].sort(),
@@ -266,6 +282,7 @@ export function recordLearning(repo, out, assessmentPath, { revise = false } = {
 export function aggregateLearning(history, config, now = Date.now()) {
   const groups = new Map(); let expired = 0;
   for (const run of history.runs) for (const o of run.current.observations) {
+    validateCompatibleIdentity(o.profile);
     assert(o.profile_id === digest(o.profile).slice(0, 16), 'Learning profile integrity mismatch');
     const age = now - Date.parse(o.at);
     if (!Number.isFinite(age) || age < -300000 || age > config.max_age_days * DAY) { expired++; continue; }
@@ -340,11 +357,13 @@ function renderBlock(profiles, config) {
     const p = g.profile, expiry = g.revalidate_after.slice(0,10);
     lines.push('', `- ${inline(p.task_type)} / ${inline(p.scope)} / ${inline(p.complexity)}; ${hostLabel(p.host)} (${inline(p.host_model)}): consider ${STRATEGIES[p.strategy]} (${inline(p.strategy_version)}), ${inline(p.role)}, ${inline(p.provider)}/${inline(p.model_identity)}, ${inline(p.mode)} access, effective ${inline(p.effective_effort)}.`,
       `  Evidence ${g.profile_id}: ${g.useful_tasks}/${g.quality_evaluated_tasks} distinct evaluated tasks useful; ${g.attempts} attempts; reported $${g.costs.reported_usd.toFixed(4)}, unresolved estimates $${g.costs.estimated_unreconciled_usd.toFixed(4)}, ${g.costs.unpriced_requests} unpriced requests. Revalidate after ${expiry} or any model/host/strategy change. This supports considering the profile, not skipping validation.`);
+    if (p.configuration_fingerprint) lines.push(`  Compatible configuration SHA-256: ${p.configuration_fingerprint}. Use this evidence only when the current approved configuration fingerprint matches exactly.`);
     const allocation = p.runtime_limits || {};
     const parts = [['max_turns', 'requests'], ['max_tool_calls', 'tools'], ['timeout_seconds', 'worker seconds'], ['max_output_tokens', 'output tokens']]
       .filter(([key]) => Number.isFinite(allocation[key])).map(([key, unit]) => `${allocation[key]} ${unit}`);
     if (parts.length) lines.push(`  Recorded allocation: ${parts.join(', ')}. Other limits and team allocations must match the local profile; this is not permission to increase them.`);
     if (p.team?.length > 1) lines.push(`  Team: ${p.team.map(w => `${inline(w.role)}=${inline(w.provider)}/${inline(w.model_identity)} (${inline(w.effective_effort)}, ${inline(w.mode)})`).join('; ')}. Do not assume the same contribution with a different team.`);
+    for (const worker of p.team || []) if (worker.configuration_fingerprint && worker.configuration_fingerprint !== p.configuration_fingerprint) lines.push(`  Companion ${inline(worker.role)} configuration SHA-256: ${worker.configuration_fingerprint}; must also match exactly.`);
   }
   if (!profiles.length) lines.push('', 'No promoted preference currently meets the evidence threshold. Use current authorized defaults; do not invent a model ranking.');
   lines.push(END);

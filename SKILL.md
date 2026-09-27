@@ -1,15 +1,33 @@
 ---
 name: pi
-description: Delegate bounded coding investigations, independent sparring, design alternatives, or candidate implementations through Pi to selected models. Preview assignments and model choices; coordinate sequences and goal-directed bounded loops with diagrams and host-reviewed handoffs. Workers write isolated candidates; the current Codex or Claude Code host controls permissions, validation, integration, cost reporting and authorized project-local routing lessons. Use for valuable independent work, not trivial edits or unauthorized external sharing.
+description: Configure Pi provider/model preferences, then delegate bounded investigations, independent sparring or isolated candidate implementations with a dedicated native supervisor and reviewer. Preview exact models and permissions, retain private failure incidents, and support approved OpenAI-compatible local servers. The primary Codex or Claude Code host validates, integrates and reviews project-local learning. Use for valuable independent work, not trivial edits or unauthorized source sharing.
 ---
 
 # pi
+
+## Guided setup
+
+When the user asks to set up Pi, configure preferred models/providers or change
+defaults, read [the setup guide](docs/setup.md). Handle this in the primary
+conversation; configuration alone needs no inference or supervisor. Inspect
+`setup show`, then ask only for missing choices: preferred route and exact models;
+local endpoint and declared capabilities when applicable; effort; budgets and
+runtime limits. Reuse the user's existing preferences. Show a concise effective
+configuration, validate with `setup check`, and save only within the user's
+requested scope. Ask before making a system-wide change; do not install or change
+host settings as part of preference setup. Never ask for keys in chat.
+
+Private reusable profiles normally live at `~/.config/pi/policy.json`; explicit
+named paths support separate hosted/local/project profiles. Setup commands do
+not edit `AGENTS.md`, host settings, shell startup files or bundled defaults.
+Profile updates require the hash of the version inspected, preserving concurrent
+edits. A saved preference is not authorization to share source or spend money.
 
 ## Authority and host
 
 You are the **current primary host: Codex or Claude Code**, never both at once. You alone choose whether to delegate, select models/permissions, validate evidence, integrate changes, assess quality and usefulness, and approve project learning. Pi workers supply proposals; they cannot decide what lands or what becomes a lesson. Agreement, confidence, verbosity, and self-reported success are not independent validation.
 
-Set `orchestrator` in every plan to `codex` or `claude-code` and `assessment.assessed_by` to `Codex` or `Claude Code` respectively. Record your actual host model/version only when known; otherwise omit them. Never impersonate the other host. Run this skill in the primary conversation. Do not move it into Claude's `context: fork`, change the host model, pre-grant broad tools, disable approvals, or wrap it in an unrestricted native subagent.
+Set `orchestrator` in every plan to `codex` or `claude-code` and `assessment.assessed_by` to `Codex` or `Claude Code` respectively. Record actual host model/version only when known. The primary conversation resolves authority and approves the plan, then **actually spawns one dedicated native sub-agent** to execute and review that plan. This supervisor is a bounded host assistant, distinct from the Pi workers; its review is advisory. Use the host's available native spawn/delegate and wait tools, record the returned agent ID, and keep its live handle. A role label, JSON receipt, terminal process or Pi worker alone does not constitute a native sub-agent. Do not change host models/settings, disable approvals, pre-grant broad tools or silently fall back to unsupervised execution. If native delegation is unavailable, report the blocker and incident; the user may explicitly choose direct execution. Read [the supervision contract](docs/supervision.md) before dispatch.
 
 Use the bundled SDK runner. Do not substitute a shell-capable Pi CLI, third-party extension, downloaded module, or recursive delegation. Read-only is the default. Worker write access means isolated candidate paths, **never the actual checkout**. No worker can execute commands, run tests, edit memory/instruction files, commit, merge, push, or apply patches.
 
@@ -21,6 +39,8 @@ On every invocation, after interpreting the request and resolving applicable pol
 
 Honor explicit model assignments and ordering. For a sequence or a loop, read `docs/workflow-contracts.md` and use the versioned workflow wrapper. Show the ordered phases, host handoffs, closing condition and limits as a diagram. Use Mermaid only when the harness is known to render it or the user explicitly asks for Mermaid; otherwise use ASCII. `workflow preview --diagram auto` defaults to ASCII; pass `--mermaid-supported true` only on established support. Do not infer rendering support from the host name.
 
+A failing named model remains the named model. Disclosing a substitution does not authorize it: use another model only within an existing explicit fallback grant, or return that decision to the primary host/user. The order of the preferred pool is not measured reliability evidence.
+
 A loop repeats an explicit sequence until the host verifies the stated criteria. When the user gives no iteration limit, propose and state **at most three complete cycles**; compile that explicit ceiling into the workflow. Use the existing authorized overall budget (normally at most the $5 default for the entire workflow), never a fresh $5 for each phase. Choose and disclose a finite elapsed-time ceiling appropriate to the task and host lifetime. If the user's closing condition is ambiguous, clarify it before dependent work. Goal satisfaction, limit exhaustion, lack of meaningful progress and blockers are different outcomes. Model agreement is not a success criterion by itself.
 
 Keep the same declared models across cycles unless the user's requested sequence assigns different models to its steps. Workflow contracts are immutable: disclose material revisions, preserve prior costs and task identity, and resolve any additional authorization before replanning. Never restart a workflow to reset spending. Nested loops, arbitrary branching and unattended resume are not supported. The host remains present and evaluates every transition; this is not a worker-managed loop.
@@ -30,6 +50,14 @@ Keep the same declared models across cycles unless the user's requested sequence
 Read the applicable user/project instructions in the host's normal precedence. Codex uses applicable `AGENTS.md`/override files. Claude Code uses applicable `CLAUDE.md` and its imports; the supported shared-project bridge is a standalone `@AGENTS.md` in the project `CLAUDE.md`. Read relevant nested instructions without ignoring higher-priority restrictions. Do not assume installing the skill initialized a task project's instructions or memory.
 
 A human-maintained `## pi` section may define providers, preferred models, effort, privacy and budgets. The convention in `templates/AGENTS.example.md` is **not parsed or executed by the runner**. Translate authorized values into plan `policy` and record their source paths in `policy_sources`. Never treat generated learning as permission to expand those settings.
+
+Read `setup show` for the saved private profile, or `setup show --config FILE`
+for the explicitly selected profile. Apply applicable user/project instructions
+over those preferences. Compile with `setup plan --config PROFILE --plan DRAFT
+--out NEW_PLAN`, inspect the reported overrides, then run normal `check`. The
+runner executes only the compiled plan; it never silently reads a changing user
+profile during a run. For workflows compile each phase's plan before freezing
+the workflow contract. Missing setup keeps bundled defaults and creates nothing.
 
 Bundled defaults preserve OpenRouter, the user's five preferred models, requested `xhigh`/complex `max`, at most three workers, two concurrent, $2 per worker and $5 per run plan. Nonpreferred provider/model choices require explicit authorization, `allow_model_exceptions`, and `model_exception_reason`. Never silently change provider, loosen privacy, raise a budget, or reduce the requested effort policy to make a call succeed.
 
@@ -47,7 +75,7 @@ Use relevant recent evidence as a **prior, not an order**. Match project scope, 
 
 Use one default `sparring-partner` role and let the assignment carry the angle. State a concrete question or decision, source/context/constraints, expected contribution, success evidence and uncertainty. Optional focus labels are `correctness`, `completeness`, `security`, `maintainability`, `design`, `planning`, plus bounded custom tags. Do not force dissent or a finding quota. State a concrete `selection_reason`; learned success never removes the need for an independent reviewer on a consequential change.
 
-Request `xhigh` for bounded work and `max` for broad, consequential or subtle work. The runner validates advertised supported levels and reports the effective setting. `best_supported` means exact, otherwise next higher, otherwise highest available; `strict` rejects a mismatch. Do not call a clamped `high` run `max`. Catalog capabilities do not establish actual model quality or account access.
+Request `xhigh` for bounded work and `max` for broad, consequential or subtle work. The runner validates advertised supported levels and reports the effective setting. `best_supported` means exact, otherwise next higher, otherwise highest available; `strict` rejects a mismatch. Do not call a clamped `high` run `max`. An explicitly approved non-reasoning compatible model requires an off-only declaration, an approval reason and worker `effort: off`; never silently lower effort. Catalog capabilities and custom declarations do not establish actual quality or account access.
 
 Each worker needs explicit `mode: read` or `mode: write`, exact `read_files` and, for write mode, exact `write_files`. No directories, globs, symlinks, credentials, binaries, whole-repository dumps or agent configuration. `AGENTS.md`, overrides, `CLAUDE.md`, local Claude instructions and `.pi` learning state are not delegable. Summarize relevant authorized instructions yourself into the task packet. Existing write targets must also be readable by that worker; explicitly authorized new paths may be absent.
 
@@ -56,7 +84,7 @@ Packet a **reviewer** tightly: an explicit submission cap (for example under 1,2
 Packet an **implementer** differently — a cap on findings is not a cap on an edit, and the defaults are sized for a bounded review:
 
 - Name every path in `write_files`, including files that do not yet exist. There are no globs, so a worker cannot create a path you did not authorize.
-- Allocate for writing. Raise `max_turns`, `max_tool_calls` and `timeout_seconds` in the plan `policy` for a multi-file change, then use per-worker `limits` to keep the reviewer in the same plan *below* that ceiling. Read the `check` advice before paying.
+- Allocate for sequential reads and edit operations, even for one dense file. Subtract reserved finishing requests from `max_turns`; a large `max_tool_calls` does not provide more provider requests. Revise plan ceilings only within authorization, then use per-worker `limits` to narrow each worker. Read the `check` advice before paying; multiple tools can share a response, so its allocation advice is a heuristic.
 - State the acceptance criteria and the smallest acceptable change, and tell it to prefer `replace_text` over rewriting whole files: a large rewrite is the usual way an output allowance is exhausted mid-edit.
 - Ask for a finished change or an honest `partial` with `remaining_work`. Do not reward a confident `complete`; you still validate it.
 
@@ -76,25 +104,31 @@ node /absolute/path/to/pi/scripts/pi.mjs models
 node /absolute/path/to/pi/scripts/pi.mjs check --plan /private/plan.json
 ```
 
-`doctor` is local and never prints a key. `models` and `check` request metadata, not inference. `check` prints a per-worker `summary` (resolved model, requested and effective effort, packet size, allocation and finishing reserve) and an `advice` list: a clamped effort, a large packet against the timeout, a wide write scope against `max_turns`, or a missing submission cap. Read the advice before paying. Install missing dependencies only with normal host authorization. `check:sdk` and `test:sdk` check an installed pinned SDK without paid calls. Credentials come from approved environment variables or the private user credential file. Do not read, display, copy or send that file. The user runs `auth` themselves in a terminal; never ask for a key in chat.
+`doctor` is local and checks the default OpenRouter setup. `models` and `check` use metadata, not inference; custom compatible declarations are local and do not probe their endpoints. `check` prints resolved model/effort, packet size, allocation, finishing reserve and planning advice. Read it before paying. Install missing dependencies only with normal host authorization. `check:sdk` and `test:sdk` use synthetic transport and no paid calls. Credentials come from approved environment variables or the private user credential file. Do not read, display, copy or send that file. The user runs `auth` themselves in a terminal; never ask for a key in chat.
 
 Prepare a plan from `templates/plan.example.json`; replace all placeholders. Specify the question or decision, constraints, selected source, expected evidence, uncertainty, model reason, effort and permissions. Add the optional `evaluation` block for stable task/assignment IDs, focus tags and exact criteria. Store plans and runs outside the source repository. Do not fabricate paths.
 
 OpenRouter is resolved against its live catalog; preserve exact IDs and only explicit policy aliases. Native adapters use the built-in allowlist and installed Pi metadata. Missing models, keys or required capabilities stop preflight. Do not silently substitute models or relax routing.
 
+For another OpenAI-compatible server, read [provider configuration](docs/openai-compatible.md). Require an approved exact base URL, model IDs, credential environment reference (or explicit no-auth), declared text/tool capabilities, limits, rates and effort. Never infer these from `/models`, invent rates, use a hosted fallback or transmit a cloud credential to a local endpoint automatically. Configuration checks are not live capability tests; live inference still requires authorization.
+
 ## 4. Execute one bounded phase
 
 For a declared sequence/loop, use `workflow run --out /private/workflow` for each phase, then `workflow decide` with your reviewed decision. See `docs/workflow-contracts.md` for preparation, decisions and cost accounting. Never substitute standalone `run` inside the workflow: it would bypass the shared ledger and deadline. Before the first phase, use `workflow check` to resolve all declared models without inference, show the brief/diagram and disclose effective effort mappings. Send a short update after each phase or cycle with the result, remaining work, cost and next step. Host decisions do not require a new user approval when already authorized.
 
-For standalone work:
+For standalone work, first spawn the native supervisor with the contract in `docs/supervision.md`. In the primary host, register the returned actual ID and approved plan:
 
 ```sh
-node /absolute/path/to/pi/scripts/pi.mjs run --plan /private/plan.json
+node /absolute/path/to/pi/scripts/pi.mjs supervise init --plan /private/plan.json --out /private/supervision --agent-id ACTUAL_NATIVE_ID
 ```
+
+Then send that directory to the already running supervisor. It runs `supervise run --out /private/supervision`, monitors the single live process, inspects the results and records `supervise review`. Wait for its handback. The primary host then performs sections 5–7. `supervise` never creates a native agent itself: the real host tool call is mandatory. `run --plan` remains a low-level compatibility command for explicit direct runs and workflow internals.
 
 Keep execution supervised by the current host. Do not detach it or promise later work. Before starting, check the **outer host-command lifetime**, which is separate from Pi's worker and request deadlines: allow for every worker wave plus preflight and billing overhead within authorized host settings. A yielded tool response with a live session handle is not a dead worker — keep that handle and use the host's supported wait mechanism instead of starting a duplicate paid run. Do not silently edit host timeouts or disable safeguards. Progress and heartbeats are JSON lines on stderr; final stdout identifies the run directory. Inspect artifacts after nonzero exits too: errors and rejected results may still incur cost.
 
 Bundled ceilings are **12 provider requests (not user turns), 60 tool calls and 600 seconds per worker**, with a model-capped output allowance. Choose a bounded task that fits, or explicitly authorize a different plan allocation. An individual worker may carry smaller `limits`; it can never raise a plan ceiling. Dollar guards are **soft**, not provider-side caps. In-flight requests can overshoot and unknown costs are not zero. Standalone runs have separate ledgers; the workflow wrapper deducts all its earlier phases, retries and reservations before admitting another phase. Account for every phase against the user's overall authorization. A restricted provider key provides an additional provider-side spending boundary.
+
+`timeout_seconds` and `request_timeout_seconds` are host-configurable plan ceilings, each at most 86,400 seconds. An actual request is also capped by the remaining worker/workflow time. Raising the request ceiling alone cannot extend either outer lifetime; inspect recorded timing and obtain any authorization needed for a revised total allocation. These are technical bounds, not spending permission.
 
 `finalization_turns` (2) and `finalization_seconds` (120) reserve the finishing allowance **inside** those ceilings, along with the last tool slot. In that window only `submit_result` is accepted, and from twice that window tool results carry the remaining seconds. A worker that read everything and timed out before writing is the most expensive failure there is, so let the reserve do its job rather than raising the timeout first. The runner also permits at most one same-session completion repair: a premature normal stop may continue the original task with its approved tools, and an output-length stop may only submit existing findings — a truncated edit is never replayed. Repairs keep the same model, effort, counters, deadline and ledger; they are not fresh runs. Set `max_completion_repairs: 0` to disable them.
 
@@ -102,7 +136,7 @@ Every worker's `result.json` carries a `stop_diagnostic` (which layer stopped it
 
 - **Operational** (`provider_rate_limit`, `provider_error`, `request_timeout`, `timeout` on a slow route, `output_limit_reasoning`): the failure says nothing about the model. At most one narrowed retry is reasonable: keep the same worker id and task id, change exactly one thing (a smaller packet, an explicit submission cap, a longer timeout, or another authorized model family), count its cost against the same authorization, and report every attempt. Never a third blind attempt.
 - **Honest partial work** (`partial`, `blocked`): the worker submitted evidence and named what is left. Judge the findings on their merits, then repacket the remainder as a new bounded phase. Do not record it as a completed success or as a model failure.
-- **Decisions** (refusal, permission denial, `model_mismatch`, `context_limit`, `budget`, `turn_limit`, `tool_limit`, unavailable capability): do not retry. Diagnose and narrow the task, and obtain any required authorization before revising it.
+- **Decisions** (refusal, permission denial, `model_mismatch`, `context_limit`, `budget`, `turn_limit`, `tool_limit`, unavailable capability): do not retry. Inspect any partial candidate before narrowing the task; a failed write run can contain useful, unvalidated work. Obtain any required authorization before revising the plan.
 
 Diagnose any incomplete run locally before changing a limit — it needs no key, network or inference and reads older run directories too:
 
@@ -111,6 +145,8 @@ node /absolute/path/to/pi/scripts/pi.mjs diagnose --out /private/run
 ```
 
 Compare recorded limits, usage, the admission arithmetic, SDK activity, the checkpoint and the host process result. A reservation failure is not proof that money was spent; a heartbeat is not proof of model progress; an unfinished report alone does not establish why a process stopped. Review partial candidate and public-output checkpoints as unvalidated material. No silent fallback, scope expansion or compaction in any case. See `docs/troubleshooting.md`.
+
+Incomplete runs automatically retain a private structural JSON/Markdown incident under `RUN/incidents/`. The supervisor checks that path and reports it. For preflight failure the supervised wrapper writes under the private supervision directory; after a host interruption, first inspect the live process handle, then run `incident --out RUN` to preserve the surviving evidence. Incident capture is local, requires no learning opt-in and never uploads anything. If writing fails, retain the original error/outcome and report `incident_write_failed`. See [incident retention and privacy](docs/incidents.md).
 
 ## 5. Evaluate and integrate as the current host
 
@@ -126,6 +162,8 @@ Recheck billing/model identity and a fresh source snapshot before integration. A
 ## 6. Assess usefulness and cost
 
 Write an assessment using `templates/assessment.example.json`; use the actual host, run, worker, criterion, artifact and finding IDs. Every worker, including failures/skips, needs a reasoned usefulness score. Schema 2 also records `quality_0_to_3` or `null`, a quality reason, exact preregistered criterion results and artifact identity. Quality judges the original assignment; usefulness is incremental value. A clean verified review may have high quality and usefulness 1. Numeric quality needs complete criterion/evidence coverage and the original artifact hash where applicable. Every finding needs accept/reject/defer, reason, independent validation and actual integration status. Keep raw findings unchanged. Usefulness scores remain: **0** no reliable incremental value; **1** useful confirmation/coverage; **2** actionable validated contribution; **3** decisive validated contribution.
+
+Validate early with `validate-assessment --assessment FILE` (shape only); add `--out RUN` for run/artifact checks. `assessment-schema` lists enums and bounds without inference. Criterion results are `passed`, `failed`, `inconclusive`, `not_run`; evidence allows at most four nonempty strings of 1,200 characters per criterion. Integration status is `not_assessed`, `not_applicable`, `candidate_only`, `accepted_modified`, `accepted_unmodified`, `rejected`, `deferred` or `unknown`. Complexity is `bounded` or `complex`; choose a documented strategy rather than inventing a slug.
 
 ```sh
 node /absolute/path/to/pi/scripts/pi.mjs report --out /private/run --assessment /private/assessment.json

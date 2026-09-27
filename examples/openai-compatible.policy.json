@@ -1,0 +1,21 @@
+{
+  "preferred_provider": "compatible:local-example",
+  "preferred_models": ["replace-with-exact-served-model-id"],
+  "openai_compatible_providers": {
+    "compatible:local-example": {
+      "base_url": "http://127.0.0.1:8000/v1",
+      "allow_insecure_http": true,
+      "auth": { "type": "none" },
+      "models": {
+        "replace-with-exact-served-model-id": {
+          "context_window": 32768,
+          "max_output_tokens": 4096,
+          "supports_tools": true,
+          "supported_efforts": ["high"],
+          "rates_usd_per_million": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
+          "compat": { "max_tokens_field": "max_tokens", "supports_usage_in_streaming": true }
+        }
+      }
+    }
+  }
+}

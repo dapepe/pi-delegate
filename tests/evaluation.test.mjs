@@ -4,7 +4,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { computeArtifactIdentity, readArtifactIdentity, validateEvaluation } from '../scripts/evaluation.mjs';
+import { computeArtifactIdentity, readArtifactIdentity, validateEvaluation, STRATEGIES } from '../scripts/evaluation.mjs';
 
 const hash = value => crypto.createHash('sha256').update(value).digest('hex');
 const json = (file, value) => fs.writeFileSync(file, JSON.stringify(value, null, 2) + '\n', { mode: 0o600 });
@@ -19,6 +19,22 @@ test('evaluation accepts bounded custom task types and rejects duplicate workers
   };
   assert.equal(validateEvaluation(evaluation).task_type, 'data-contract');
   assert.throws(() => validateEvaluation({ ...evaluation, workers: [...evaluation.workers, { ...evaluation.workers[0], assignment_id: 'assignment-b' }] }), /Duplicate evaluation worker/);
+});
+
+test('evaluation diagnostics give allowed strategies and indexed criterion bounds', () => {
+  const evaluation = {
+    schema_version: 1, task_id: 'synthetic', task_type: 'review', scope: '.', complexity: 'bounded',
+    strategy: 'descriptive-unlisted-strategy', strategy_version: 'v1', focus: [],
+    workers: [{ agent_id: 'worker', assignment_id: 'assignment', attempt_index: 1, criteria: [{ id: 'behavior', requirement: 'Synthetic requirement.' }] }]
+  };
+  assert.throws(() => validateEvaluation(evaluation), error => {
+    assert.match(error.message, /evaluation\.strategy: received "descriptive-unlisted-strategy"; expected one of/);
+    for (const strategy of STRATEGIES) assert.ok(error.message.includes(strategy));
+    return true;
+  });
+  evaluation.strategy = 'single-review';
+  evaluation.workers[0].criteria[0].requirement = 'x'.repeat(1201);
+  assert.throws(() => validateEvaluation(evaluation), /evaluation\.workers\[0\]\.criteria\[0\]\.requirement.*max 1200 characters/);
 });
 
 test('artifact identity round-trips add, modify, and delete changes against the saved snapshot', () => {

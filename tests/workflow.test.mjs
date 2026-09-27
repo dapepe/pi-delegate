@@ -60,6 +60,19 @@ test('workflow validation rejects unknown fields, unbounded loops, foreign hosts
   }
   for (const strategy of ['sequence', 'bounded-loop']) { assert.ok(evaluationStrategies.includes(strategy)); assert.ok(Object.hasOwn(learningStrategies, strategy)); }
 });
+test('workflow preflight failure retains an incident without losing the cause or starting inference', async t => {
+  const f = fixture(t); f.init(); let requests = 0;
+  await assert.rejects(f.run(undefined, undefined, {
+    resolve: async () => { throw new Error('synthetic model metadata unavailable'); },
+    adapter: () => { requests++; throw new Error('inference must not start'); }
+  }), error => {
+    assert.equal(error.message, 'synthetic model metadata unavailable'); assert.ok(error.incident.json); return true;
+  });
+  const state = workflowStatus(f.out);
+  assert.equal(requests, 0); assert.equal(state.status, 'awaiting_host');
+  assert.equal(state.runs[0].status, 'preflight_failed');
+  assert.ok(fs.existsSync(state.runs[0].incident.markdown));
+});
 
 test('preview uses the same sequence and loop edges in Mermaid and ASCII and escapes labels', t => {
   const f = fixture(t, true), w = validateWorkflow(f.workflow);

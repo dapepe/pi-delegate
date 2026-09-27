@@ -5,6 +5,8 @@ project. Project examples are under templates/. Keep the skill name `pi`.
 
 The current primary host (Codex or Claude Code) remains sole orchestrator,
 permission grantor, validator, integration decision maker and learning reviewer.
+It dispatches a bounded native execution/review supervisor for Pi delegation;
+that supervisor supplies advisory evidence under the host-approved contract.
 Preserve isolated candidate writes, exact file/model allowlists, truthful costs,
 and no shell, automatic code integration, recursive delegation or silent fallback.
 Workers must not access instruction files, credentials, or learning state.

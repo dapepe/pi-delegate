@@ -5,7 +5,12 @@
 A standalone skill for bounded multi-model coding delegation through Pi. The current host selects models, context, thinking effort and permissions; independently validates the results; and alone decides what to integrate. A default independent `sparring-partner` can review bugs, gaps, security, cleanup, implementation/design alternatives, plans or task definitions against a concrete assignment. Workers can review *and* implement: a `mode: write` worker edits an isolated candidate overlay and hands back a patch, never the real checkout. Optional project-local learning turns validated outcomes into compact, reviewed routing preferences in `AGENTS.md`.
 
 Each invocation begins with a delegation brief showing assignments, model choices,
-permissions and completion criteria. Describe a sequence or a bounded loop in your
+permissions and completion criteria, followed by a real host-native supervisor
+sub-agent that monitors Pi execution and reviews its results. The primary host
+retains final validation, permission and integration decisions. Failed/incomplete
+runs retain private JSON/Markdown incidents beside the run. See
+[supervision](docs/supervision.md) and [incident reports](docs/incidents.md).
+Describe a sequence or a bounded loop in your
 request: the host shows its Mermaid/ASCII diagram, coordinates each phase, and verifies
 the closing condition within one shared budget and deadline. See
 [workflow contracts and examples](docs/workflow-contracts.md).
@@ -20,7 +25,7 @@ I am curious to learn how others use different models and skills — happy to di
 
 ## Install
 
-Requires **Node.js 22.19.0+**, npm, a local host able to run the scripts, and an approved model-provider key. Pi SDK is pinned to **0.85.1**; a separate global Pi CLI is not needed. [Pinned SDK requirement](https://raw.githubusercontent.com/earendil-works/pi/v0.85.1/packages/agent/package.json).
+Requires **Node.js 22.19.0+**, npm, a local host with native sub-agent and script tools, and an approved provider route (a key unless explicitly configured as no-auth). Pi SDK is pinned to **0.85.1**; a separate global Pi CLI is not needed. [Pinned SDK requirement](https://raw.githubusercontent.com/earendil-works/pi/v0.85.1/packages/agent/package.json).
 
 Extract the ZIP or clone the repository, then run from its root:
 
@@ -75,6 +80,19 @@ Report usefulness and Pi cost. Use project learning only when it is enabled.
 
 For repository-only installation, add `--repo /absolute/project/root`; the corresponding destinations are `.agents/skills/pi` and `.claude/skills/pi`. A local installation does not provision remote/Cowork sessions or bypass host sandbox/network approval. Full guides: [both hosts](docs/install.md), [Codex Desktop](docs/desktop-install.md), [Claude Code](docs/claude-code-install.md).
 
+## Set up your preferences
+
+Ask the installed skill: **“Set up Pi with my preferred providers and models.”**
+It guides you through route/model choices, effort, budgets and runtime limits,
+checks the configuration without inference, and saves a private reusable policy
+within your requested scope. Credentials remain environment references or the
+existing private credential setup; never paste keys into chat.
+
+The usual profile is `~/.config/pi/policy.json`. You can also keep separate named
+profiles for hosted and local infrastructure. The skill compiles a selected
+profile into each approved plan and shows task-specific overrides; the runner
+does not pick up changing preferences mid-run. See [guided setup](docs/setup.md).
+
 ## Authority and isolation
 
 Read workers receive only bounded list/read/search and structured-result tools. Write workers additionally create, replace and delete explicitly authorized **candidate** files in their private in-memory overlay. They cannot change the actual checkout, execute commands or tests, invoke arbitrary network tools, load extensions, recursively delegate, commit, merge, or push. Instruction and memory files are not delegable source or write targets.
@@ -96,6 +114,13 @@ meta/muse-spark-1.3
 ```
 
 The configured explicit alias for `x-ai/grok-latest` is `~x-ai/grok-latest`. The runner rechecks the live catalog, records exact requested/resolved/returned identities and refuses unavailable or unauthorized substitutions. The list is a preference, not a promise of permanent availability or account access. [OpenRouter catalog](https://openrouter.ai/api/v1/models).
+
+Additional servers use an explicit `openai_compatible_providers` registry: exact
+endpoint/model allowlists, environment-key or no-auth selection, declared tool and
+effort capabilities, limits and cost estimates. This includes local infrastructure
+serving OpenAI Chat Completions with streamed tool calls. See
+[configuration and a synthetic example](docs/openai-compatible.md). Endpoint
+compatibility must be tested; catalog declarations alone do not prove it.
 
 Request `xhigh`, or `max` for more complex work. `best_supported` resolves exact, otherwise next higher supported, otherwise highest available; all mappings are reported. `strict` refuses non-exact mappings. No fixed model specialty or performance ranking is invented.
 
@@ -121,7 +146,7 @@ A worker with `mode: "write"` gets `write_file`, `replace_text` and `delete_file
 Three things matter more for an implementer than for a reviewer:
 
 - **Name every path up front**, including files that do not exist yet. There are no globs or directories, so a worker cannot create a file you did not authorize. Existing targets must also be readable by that worker.
-- **Allocate for writing.** The defaults (12 provider requests, 60 tool calls, 600 seconds) suit a bounded review. A multi-file change needs more, set in the plan `policy`; a per-worker `limits` block can then hold each role *below* that ceiling. `check` warns when a wide `write_files` meets a small `max_turns`.
+- **Allocate for writing.** Estimate sequential reads and edits, including replacements within one dense file, and subtract finishing requests. Revise authorized plan ceilings as needed; per-worker `limits` can narrow them. `check` warns about small working-request allocations and a tool allowance that would bind later than sequential provider requests.
 - **Ask for a finished change or an honest `partial`.** Workers declare `completion` as `complete`, `partial` or `blocked` and must list `remaining_work` when unfinished — better a submitted half with a named remainder than a confident claim you have to discover is wrong.
 
 A productive pattern is one independent sparring partner reviewing a concrete question, with candidate-write permission added only when an isolated implementation is useful. The reviewer in the same plan sees the original snapshot, not the candidate patch; to have a candidate reviewed, inspect it yourself and authorize a later read-only plan against it. Do not require forced dissent or a finding quota: a clean verified review may be high quality with usefulness 1.

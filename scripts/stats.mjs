@@ -17,6 +17,7 @@ import { readRunInventory as readCoreRunInventory } from './insights-store.mjs';
 import { validateAssessment } from './report.mjs';
 import { evaluationsMatch, readArtifactIdentity } from './evaluation.mjs';
 import { mergePolicy, validatePlan, workerPolicy } from './lib.mjs';
+import { compatibleConfigurationFingerprint } from './compatible.mjs';
 
 const DAY = 86_400_000;
 const MAX_JSON_BYTES = 32 * 1024 * 1024;
@@ -280,7 +281,8 @@ function modelInfo(raw = {}, planAgent = {}, report = {}) {
   const runtime = modelField(model, 'runtime_limits', 'limits') ?? modelField(planAgent, 'runtime_limits', 'limits');
   const limits = runtime && typeof runtime === 'object' ? Object.fromEntries(MODEL_LIMIT_KEYS.filter(k => number(runtime[k]) !== null).map(k => [k, runtime[k]])) : {};
   const team = modelField(model, 'team') ?? modelField(planAgent, 'team');
-  const teamKey = Array.isArray(team) ? team.map(entry => `${safeText(entry?.role)}/${safeText(entry?.provider)}/${safeText(entry?.model_identity ?? entry?.resolved_model)}/${safeText(entry?.effective_effort)}`).sort().join('|') : cleanText(team, 1000) || '';
+  const compatibleTeam = Array.isArray(team) ? team.filter(entry => entry?.provider?.startsWith('compatible:')).map(entry => /^[a-f0-9]{64}$/.test(entry.configuration_fingerprint || '') ? entry.configuration_fingerprint : 'unknown').sort() : [];
+  const teamKey = Array.isArray(team) ? team.map(entry => `${safeText(entry?.role)}/${safeText(entry?.provider)}/${safeText(entry?.model_identity ?? entry?.resolved_model)}/${safeText(entry?.effective_effort)}${entry?.provider?.startsWith('compatible:') ? `/${safeText(entry.configuration_fingerprint, 'unknown')}` : ''}`).sort().join('|') : cleanText(team, 1000) || '';
   const skillVersion = cleanText(modelField(model, 'skill_version') ?? modelField(planAgent, 'skill_version') ?? report.skill_version, 120);
   const sdkVersion = cleanText(modelField(model, 'sdk_version') ?? modelField(planAgent, 'sdk_version') ?? report.sdk_version_target ?? report.sdk_version, 120);
   // Legacy learning profiles omit this marker; v2 profiles carry it. Keep the
@@ -288,6 +290,8 @@ function modelInfo(raw = {}, planAgent = {}, report = {}) {
   const profileSchemaVersion = firstInteger(modelField(model, 'profile_schema_version') ?? modelField(planAgent, 'profile_schema_version'));
   return {
     provider: provider || 'unknown', requested_model: requested || 'unknown', resolved_model: resolved || 'unknown', canonical_slug: canonical || null, alias_target: aliasTarget || null,
+    ...(provider?.startsWith('compatible:') ? { configuration_fingerprint: /^[a-f0-9]{64}$/.test(model.configuration_fingerprint || '') ? model.configuration_fingerprint : null } : {}),
+    ...(compatibleTeam.length ? { compatible_team_fingerprints: compatibleTeam } : {}),
     model_identity: canonical || aliasTarget || resolved || requested || 'unknown',
     upstream_providers: upstreamProviders, requested_effort: requestedEffort || 'unknown', effective_effort: effort || 'unknown',
     host, host_model: safeText(report.orchestrator_model ?? model.host_model), host_version: safeText(report.orchestrator_version ?? model.host_version),
@@ -298,6 +302,7 @@ function modelInfo(raw = {}, planAgent = {}, report = {}) {
 
 function profileKey(model, role) {
   return JSON.stringify({ provider: model.provider, resolved_model: model.resolved_model, canonical_slug: model.canonical_slug, alias_target: model.alias_target, model_identity: model.model_identity, requested_model: model.requested_model,
+    ...(model.provider.startsWith('compatible:') ? { configuration_fingerprint: model.configuration_fingerprint } : {}),
     upstream_providers: model.upstream_providers, requested_effort: model.requested_effort, effective_effort: model.effective_effort,
     host: model.host, host_model: model.host_model, host_version: model.host_version, mode: model.mode,
     runtime_limits: model.runtime_limits, team_key: model.team_key, profile_schema_version: model.profile_schema_version,
@@ -410,6 +415,7 @@ function durableObservation({ project, run, observation, sourceKind, sourcePath 
     id: o.agent_id, role: profile.role ?? o.role, status: o.status, model: {
       ...modelValue,
       provider: profile.provider ?? o.provider ?? modelValue.provider, requested_model: profile.requested_model ?? o.requested_model ?? modelValue.requested_model,
+      configuration_fingerprint: profile.configuration_fingerprint ?? modelValue.configuration_fingerprint,
       resolved_model: profile.resolved_model ?? o.resolved_model ?? modelValue.resolved_model, canonical_slug: profile.model_identity ?? modelValue.canonical_slug,
       requested_effort: profile.requested_effort ?? o.requested_effort ?? modelValue.requested_effort, effective_pi_effort: profile.effective_effort ?? o.effective_effort ?? modelValue.effective_pi_effort,
       mode: profile.mode ?? o.mode ?? modelValue.mode, runtime_limits: profile.runtime_limits ?? o.runtime_limits ?? modelValue.runtime_limits, team: profile.team ?? o.team ?? modelValue.team,
@@ -1127,7 +1133,17 @@ export function recommendFromStats(stats, plan) {
     const pool = authorizedModelPool(plan, planModel);
     const shortlist = [];
     for (const candidate of pool) {
-      const matches = (stats.models || []).filter(profile => (profile.model.requested_model === candidate.requested_model || profile.model.resolved_model === candidate.requested_model || profile.model.model_identity === candidate.requested_model) && profile.model.provider === candidate.provider);
+      let fingerprint = null;
+      let teamFingerprints = [];
+      const policy = recommendationPolicy(plan);
+      if (candidate.provider.startsWith('compatible:')) {
+        try { fingerprint = compatibleConfigurationFingerprint(policy, candidate.provider, candidate.requested_model); } catch { /* Unknown or invalid configuration supplies no matching evidence. */ }
+      }
+      try {
+        teamFingerprints = (plan.agents || []).map(agent => agent.id === planModel.agent_id ? { provider: candidate.provider, model: candidate.requested_model } : { provider: agent.provider || policy.preferred_provider, model: agent.model })
+          .filter(agent => agent.provider?.startsWith('compatible:')).map(agent => compatibleConfigurationFingerprint(policy, agent.provider, agent.model)).sort();
+      } catch { teamFingerprints = null; }
+      const matches = (stats.models || []).filter(profile => (profile.model.requested_model === candidate.requested_model || profile.model.resolved_model === candidate.requested_model || profile.model.model_identity === candidate.requested_model) && profile.model.provider === candidate.provider && (!candidate.provider.startsWith('compatible:') || (fingerprint && profile.model.configuration_fingerprint === fingerprint)) && (!profile.model.compatible_team_fingerprints || JSON.stringify(profile.model.compatible_team_fingerprints) === JSON.stringify(teamFingerprints)));
       for (const profile of matches.slice(0, 2)) {
         const dimensions = profileDimensions(profile, candidate);
         if (dimensions.length > 0 && dimensions.every(dimension => dimension.status === 'match')) descriptiveDimensionMatches++;

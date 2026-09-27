@@ -125,3 +125,25 @@ Schema-2 assessments separate `quality_0_to_3` (the original assignment against 
 - [Claude environment variables](https://code.claude.com/docs/en/env-vars): host command and API timeouts.
 - [Codex unified-exec handler](https://raw.githubusercontent.com/openai/codex/main/codex-rs/core/src/tools/handlers/unified_exec.rs): yield and timeout fields; see also [command handling](https://raw.githubusercontent.com/openai/codex/main/codex-rs/core/src/tools/handlers/unified_exec/exec_command.rs). This is current upstream source, not a guarantee about every shipped Desktop version.
 - [OpenRouter reasoning](https://openrouter.ai/docs/guides/best-practices/reasoning-tokens): combined reasoning/output allowance and `length` stops.
+## New diagnostics and supervised execution
+
+Use [native supervision](supervision.md) to keep a dedicated execution/review
+agent attached to each delegation. Incomplete runs automatically save private
+[incidents](incidents.md), including before-run errors caught by the supervised
+wrapper and workflow preflight failures. `incident --out RUN` also reads surviving
+checkpoints locally after host-side process inspection.
+
+`timeout must be an integer` can originate in the SDK before transport when a
+fractional seconds-to-milliseconds conversion reaches OpenAI's client. The runner
+now floors the request timeout to integral milliseconds inside the existing
+deadline. This is distinct from an upstream timeout or poor model reasoning.
+
+A finishing reserve already applies to provider requests as well as time. It
+restricts the remaining tools to `submit_result`; it cannot compel a model to
+submit. A `turn_limit` result can therefore still contain a recoverable candidate.
+Inspect its hashes, source freshness and contents before deciding on a new plan.
+
+For `compatible:<name>` errors, check the exact endpoint, served model ID, declared
+tool/effort capabilities and deployment-specific serialization. Metadata preflight
+does not prove live compatibility. Do not retry with a different key, hosted route,
+model or effort setting automatically. See [provider configuration](openai-compatible.md).

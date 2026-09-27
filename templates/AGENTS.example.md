@@ -2,6 +2,11 @@
 
 The current primary host (Codex or Claude Code) is the sole orchestrator and integration decision maker. It may delegate bounded work to Pi when the expected value justifies the cost and the user/workspace policy permits the required external data transfer. Read-only is the default. Candidate-write permission requires an explicit file list; the main checkout is never writable by a Pi worker. The host decides which findings/edits to accept, validates them, and reports quality, usefulness and cost.
 
+The host starts one actual native supervisor to monitor and review the approved
+Pi plan. This supervisor cannot expand permissions, substitute models, integrate
+candidates or change learning. Retain local incident reports for incomplete
+delegation and return their private paths to the host.
+
 Before paid delegation, show a brief with the goal, assignments/roles, exact models,
 effort, access scope, closing condition and total allowance. Continue within existing
 authorization unless I request approval or plan-only. Show sequences and bounded loops

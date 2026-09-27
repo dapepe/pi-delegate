@@ -4,6 +4,13 @@
 
 The model receives only explicitly supplied tools. Those tools operate on allowlisted text maps, not arbitrary host paths. Read-only workers have no write capability; authorized write workers modify only a private candidate overlay. There is no model-exposed shell, process execution, general network tool, extension loader, delegation tool, commit/merge/push operation, or integration command.
 
+The dedicated native supervisor is a separate trusted host assistant. It uses
+normal host approvals to run the approved SDK plan and review private results;
+the Pi worker restrictions above apply inside each SDK Agent. The primary host
+retains permission, validation, integration and learning authority. Supervisor
+receipts are host attestations, not authentication of host tool events. See
+[the supervision contract](supervision.md).
+
 Snapshots reject sensitive path patterns, symlinks, traversal, binaries, unbounded text, reserved Windows names, and case/Unicode collisions. Existing write paths must also be readable. Source hashes and modes support a staleness check. The source-reading code limits the bytes read even when another process grows the file.
 
 The runner exports candidates outside the source repository, refuses an existing run output directory, and does not execute candidate text. Models cannot mutate another worker's candidate map. Submissions terminate tool use; findings must reference available files and in-range lines. This validates structure, not truth.
@@ -47,6 +54,12 @@ OpenRouter routing constraints can reduce available routes. Do not relax data or
 ## Artifacts and retention
 
 The implementation stores compact metadata instead of full transcripts/reasoning traces. Nevertheless, task text, source snippets, findings, proposed tests, and candidate files can contain private code. Run directories default to private user cache storage and remain there until the user deletes them. There is no scheduled cleanup, background daemon, or telemetry upload added by this project.
+
+Automatic incidents separately allowlist structural facts, hash identifiers and
+omit raw prompts, source, worker text, credential values and provider errors.
+They are private files under `RUN/incidents`; reporting failure does not erase
+the run result. Supervisor review files may contain private evidence, so keep
+the entire supervision directory private. See [incident retention](incidents.md).
 
 The release/install allowlist excludes dependencies, `.git`, arbitrary root files, credentials, and runtime directories. It also rejects obvious secret files inside allowed directories. This is not a secret scanner for all strings: review the final ZIP and `git diff --cached` before publishing. Do not add real session artifacts to examples or attach them to public issues without careful redaction.
 

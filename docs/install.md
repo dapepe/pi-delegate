@@ -7,8 +7,10 @@ Claude plugin and does not replace the native Codex or Claude Code agent.
 
 Use Node.js **22.19.0 or newer** and npm in the same execution environment as the
 host. The SDK remains pinned to **Pi 0.85.1**; no separate global Pi CLI is needed.
-An approved OpenRouter API key and external-data authorization are required for
-inference. Local setup and offline tests do not make inference requests.
+Inference requires authorization for the chosen route and data, plus its approved
+credential when required. OpenRouter needs an API key; an explicitly configured
+compatible route may use its own environment-variable credential or no authentication.
+Local setup and offline tests do not make inference requests.
 
 ## Choose the host
 
@@ -87,6 +89,14 @@ ACL. Prefer a restricted OpenRouter key. Never paste a key into an AI chat.
 file. A terminal export does not necessarily reach an app launched elsewhere.
 See [security](security.md) for platform limits; the script never loads `.env`.
 
+## Configure preferences
+
+After installation, ask `$pi` in Codex or `/pi` in Claude Code to **set up preferred
+providers and models**. The [guided setup](setup.md) supports a private default
+profile or explicit named profiles for local/hosted models. It validates locally,
+stores no keys and does not run inference or change host settings. This step is
+optional; an unconfigured installation keeps the bundled defaults.
+
 ## Invoke
 
 Codex: choose **pi** in its Skills picker; CLI/IDE surfaces accept `$pi`. Restart
@@ -105,6 +115,9 @@ actually desired. Direct skill installation retains `/pi`. This project does
 not set `context: fork`, a host-model override, `allowed-tools`, permission
 bypasses, or hooks. Both hosts may discover the skill from its description;
 external spending and source disclosure still require applicable authorization.
+The primary conversation explicitly starts a bounded native supervisor at
+invocation using the host's available sub-agent tools. Installation does not
+enable those tools or alter their permissions; see [supervision](supervision.md).
 For manual-only invocation, Claude supports `disable-model-invocation: true`
 in skill frontmatter, while Codex supports `allow_implicit_invocation: false`
 in `agents/openai.yaml`. Change the appropriate host setting deliberately.

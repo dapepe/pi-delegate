@@ -96,7 +96,7 @@ function tokensFor(records) {
 }
 function modelCompact(model) {
   if (!model || typeof model !== 'object') return null;
-  const fields = ['provider', 'requested_model', 'resolved_model', 'canonical_slug', 'requested_effort', 'effective_pi_effort', 'capability_source', 'checked_at'];
+  const fields = ['provider', 'requested_model', 'resolved_model', 'canonical_slug', 'requested_effort', 'effective_pi_effort', 'capability_source', 'checked_at', 'endpoint_fingerprint', 'configuration_fingerprint'];
   const compact = Object.fromEntries(fields.filter(key => model[key] !== undefined && model[key] !== null).map(key => [key, safeText(String(model[key]), `model.${key}`, 512)]));
   if (model.catalog_alias_target && typeof model.catalog_alias_target === 'object') compact.catalog_alias_target = Object.fromEntries(['slug', 'canonical_slug'].filter(key => model.catalog_alias_target[key]).map(key => [key, safeText(String(model.catalog_alias_target[key]), `model.catalog_alias_target.${key}`, 512)]));
   return compact;

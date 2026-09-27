@@ -4,6 +4,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { TextDecoder } from 'node:util';
 import { ROLE_DEFAULT, validateEvaluation } from './evaluation.mjs';
+import { validateCompatibleProviders, isCompatibleProvider, resolveCompatibleModel } from './compatible.mjs';
 
 export const HOSTS = Object.freeze({ codex: 'Codex', 'claude-code': 'Claude Code' });
 export function hostLabel(host = 'codex') { assert(Object.hasOwn(HOSTS, host), 'Orchestrator must be codex or claude-code'); return HOSTS[host]; }
@@ -81,7 +82,8 @@ export function mergePolicy(defaults, override = {}) {
     model_aliases: { ...defaults.model_aliases, ...(override.model_aliases || {}) },
     openrouter_routing: { ...defaults.openrouter_routing, ...(override.openrouter_routing || {}) }
   };
-  assert(PROVIDERS.has(p.preferred_provider), 'Supported providers: openrouter, openai, anthropic, google');
+  validateCompatibleProviders(p.openai_compatible_providers);
+  assert(PROVIDERS.has(p.preferred_provider) || isCompatibleProvider(p, p.preferred_provider), 'Provider must be built in or an explicitly configured compatible route');
   assert(Array.isArray(p.preferred_models) && p.preferred_models.length && p.preferred_models.every(x => typeof x === 'string' && x.length), 'preferred_models must be a nonempty string array');
   assert(['xhigh', 'max'].includes(p.default_effort) && ['xhigh', 'max'].includes(p.complex_effort), 'Default and complex effort must be xhigh or max');
   assert(['best_supported', 'strict'].includes(p.effort_policy), 'effort_policy must be best_supported or strict');
@@ -208,7 +210,7 @@ export function validatePlan(input, defaults) {
     const role = a.role ?? ROLE_DEFAULT;
     text(role, 'role', 300); text(a.task, 'task'); text(a.selection_reason, 'selection_reason', 4000); text(a.model, 'model', 200);
     const provider = a.provider || policy.preferred_provider;
-    assert(PROVIDERS.has(provider), `Unsupported provider: ${provider}`);
+    assert(PROVIDERS.has(provider) || isCompatibleProvider(policy, provider), `Unsupported provider: ${provider}`);
     if (provider !== policy.preferred_provider || !policy.preferred_models.includes(a.model)) {
       assert(policy.allow_model_exceptions && typeof a.model_exception_reason === 'string' && a.model_exception_reason.trim().length > 0 && a.model_exception_reason.length <= 4000, `Nonpreferred provider/model ${provider}/${a.model} needs allow_model_exceptions and model_exception_reason`);
     }
@@ -219,7 +221,8 @@ export function validatePlan(input, defaults) {
     assert(a.mode !== 'read' || writable.length === 0, 'Read-only agent cannot have write_files');
     assert(a.mode !== 'write' || writable.length > 0, 'Write agent requires explicit write_files');
     const effort = a.effort || policy.default_effort;
-    assert(['xhigh', 'max'].includes(effort), 'Each requested effort must be xhigh or max');
+    if (isCompatibleProvider(policy, provider)) resolveCompatibleModel(policy, { provider, model: a.model, effort });
+    else assert(['xhigh', 'max'].includes(effort), 'Each requested effort must be xhigh or max');
     workerPolicy(policy, a.limits); // A per-worker allocation may narrow the plan ceiling, never raise it.
     return { ...a, role, provider, effort, read_files: accessible, write_files: writable };
   });

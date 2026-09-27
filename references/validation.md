@@ -1,3 +1,39 @@
+# Validation record — pi 1.7.0
+
+Executed locally on September 27, 2026, on macOS with Node 22.23.1:
+
+- Clean `npm ci --ignore-scripts --offline --no-audit --no-fund` succeeded from
+  the existing package cache and tracked lockfile. A separate online `npm audit`
+  reported zero vulnerabilities. Dependency versions are unchanged.
+- `npm test`: 247 tests passed, zero failures. New synthetic coverage includes
+  supervision receipts and source/artifact binding, automatic private incidents,
+  compatible-provider policy and transport restrictions, configuration-specific
+  learning identity, fractional request timeouts, assessment diagnostics and
+  private setup profiles with conflict detection and serialized writes.
+- `npm run check:sdk` passed; `npm run test:sdk` passed 15 installed-SDK tests
+  with synthetic transport. No live provider request was made.
+- An actual Codex native sub-agent supervised a synthetic installed-SDK Agent
+  run, reviewed its candidate and saved a current advisory receipt. The primary
+  host independently verified original source bytes and candidate bytes. An
+  initial synthetic-driver import failure produced a preserved incident; the
+  primary host explicitly approved one corrected synthetic attempt.
+- An independent native sub-agent exercised the setup CLI using a synthetic
+  compatible model: explicit non-reasoning approval, exact route/model, private
+  save, plan compilation, inspected-hash replacement and stale-hash refusal.
+  In-repository plan output and non-private profile directories were rejected.
+- Skill quick validation and `git diff --check` passed. The release allowlist
+  includes the new modules, documentation, example and synthetic tests, with no
+  private run artifacts, learning state, credentials or dependencies.
+
+No paid inference, actual infrastructure endpoint, Claude Code native execution,
+or cross-platform host UI discovery was tested for this release. Native agent
+receipts attest the host-supplied identity; CLI receipt creation alone does not
+prove an agent was spawned. Synthetic tests do not establish model quality or
+live endpoint compatibility. GitHub CI status is reported separately in the
+published release after observing its outcome.
+
+---
+
 # Validation record — pi 1.6.1 (workflow enhancement)
 
 Executed locally on September 22, 2026, on macOS with Node 22.23.1:

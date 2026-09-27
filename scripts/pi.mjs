@@ -12,15 +12,18 @@ import {
   authorizedIdentities, classifyStop
 } from './lib.mjs';
 import { evaluationCriteriaPrompt, computeArtifactIdentity, evaluationsMatch, readArtifactIdentity } from './evaluation.mjs';
-import { keyFor, scrub, doctor, authenticate, nodeSupported } from './environment.mjs';
-import { markdownReport, validateAssessment, aggregateLedger } from './report.mjs';
+import { keyFor, scrub, doctor, authenticate, nodeSupported, SECRET_VALUES } from './environment.mjs';
+import { markdownReport, validateAssessment, validateAssessmentShape, assessmentSchema, aggregateLedger } from './report.mjs';
 import { runtimeLimits, finalizationReserve, shouldFinalize, publicText, isExplicitRefusal, explainStop, diagnoseRun } from './runtime.mjs';
 import { beginRunInventory, updateRunInventory } from './insights-store.mjs';
+import { preflightAdvice } from './preflight.mjs';
+import { isCompatibleProvider, resolveCompatibleModel, compatibleKeyFor, loadCompatibleAdapter } from './compatible.mjs';
+import { needsIncident, tryWriteIncident } from './incidents.mjs';
 
 const HOME = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const DEFAULTS = JSON.parse(fs.readFileSync(path.join(HOME, 'defaults.json'), 'utf8'));
 const SDK_VERSION = '0.85.1';
-const SKILL_VERSION = '1.6.1';
+const SKILL_VERSION = '1.7.0';
 const API = 'https://openrouter.ai/api/v1';
 const readJson = filename => JSON.parse(fs.readFileSync(filename, 'utf8'));
 function enrichReportArtifacts(runDir, report) {
@@ -58,7 +61,8 @@ async function getJson(url, key, timeout = 15000) {
   assert(response.ok, `API request failed with HTTP ${response.status} (${new URL(url).pathname})`);
   return response.json();
 }
-async function loadAdapter(provider) {
+async function loadAdapter(provider, policy) {
+  if (policy && isCompatibleProvider(policy, provider)) return loadCompatibleAdapter(policy, provider);
   // Static import table: neither an AGENTS file nor a model can name executable modules.
   const adapters = {
     openrouter: () => import('@earendil-works/pi-ai/providers/openrouter').then(m => m.openrouterProvider()),
@@ -73,6 +77,7 @@ export async function makeResolver(policy) {
   let catalog;
   const adapters = new Map();
   return async agent => {
+    if (isCompatibleProvider(policy, agent.provider)) return resolveCompatibleModel(policy, agent);
     let model, alias = null, item, supported, aliasTarget = null;
     if (agent.provider === 'openrouter') {
       catalog ||= getJson(`${API}/models`).then(value => value.data);
@@ -183,8 +188,9 @@ export async function executeJob(input, requestedOut, dependencies = {}) {
   const prepared = [];
   for (const a of plan.agents) {
     const resolved = await resolve(a);
-    const key = dependencies.keyFor ? dependencies.keyFor(a.provider) : keyFor(a.provider);
-    const adapter = dependencies.adapter ? dependencies.adapter(a.provider) : await loadAdapter(a.provider);
+    const key = dependencies.keyFor ? dependencies.keyFor(a.provider) : isCompatibleProvider(plan.policy, a.provider) ? compatibleKeyFor(plan.policy, a.provider) : keyFor(a.provider);
+    SECRET_VALUES.add(key);
+    const adapter = dependencies.adapter ? dependencies.adapter(a.provider) : await loadAdapter(a.provider, plan.policy);
     prepared.push({ agent: a, ...resolved, key, adapter });
   }
   const Agent = dependencies.Agent || (await import('@earendil-works/pi-agent-core')).Agent;
@@ -382,15 +388,17 @@ export async function executeJob(input, requestedOut, dependencies = {}) {
         const request = current;
         // One slow request must be distinguishable from a worker that ran out of total time, so
         // the two deadlines are armed separately; the request one can never outlive the worker.
-        const requestTimeout = Math.min(policy.request_timeout_seconds, Math.max(0.001, policy.timeout_seconds - elapsed()));
-        request.request_timeout_seconds = requestTimeout;
-        requestTimer = timers.setTimeout(() => { setReason('request_timeout'); agent.abort(); }, requestTimeout * 1000);
+        // Floating-point seconds can become 198.99999999995543 ms. The OpenAI SDK
+        // rejects nonintegers before transport; floor so rounding never extends the deadline.
+        const requestTimeoutMs = Math.max(1, Math.floor(Math.min(policy.request_timeout_seconds, Math.max(0.001, policy.timeout_seconds - elapsed())) * 1000));
+        request.request_timeout_seconds = requestTimeoutMs / 1000;
+        requestTimer = timers.setTimeout(() => { setReason('request_timeout'); agent.abort(); }, requestTimeoutMs);
         armIdleTimer();
         checkpoint();
         progress({ type: 'request_started', worker: spec.id, model: model.id, turn: used, finalizing });
         return adapter.streamSimple(selected, context, {
           ...options, apiKey: key, maxTokens: metadata.max_output_tokens,
-          maxRetries: 0, timeoutMs: requestTimeout * 1000,
+          maxRetries: 0, timeoutMs: requestTimeoutMs,
           onPayload: (payload, selectedModel) => {
             if (spec.provider === 'openrouter') {
               assert(payload.model === model.id, 'Outgoing request tried to change model');
@@ -592,6 +600,10 @@ export async function executeJob(input, requestedOut, dependencies = {}) {
     inventoryLifecycle = cancelled ? 'cancelled' : report.agents.every(agent => agent.status === 'completed') ? 'completed' : 'failed';
     persist({ inventory: true });
   }
+  if (needsIncident(report)) {
+    report.incident = tryWriteIncident(out, { report, usage: { requests, costs: report.costs }, phase: 'execution' });
+    persist();
+  }
   fs.writeFileSync(path.join(out, 'report.md'), markdownReport(report), { mode: 0o600 });
   return { out, report };
 }
@@ -600,8 +612,11 @@ async function listModels(policy) {
   const rows = [];
   for (const model of policy.preferred_models) {
     try {
-      const entry = await resolve({ model, provider: policy.preferred_provider, effort: policy.default_effort });
-      rows.push({ available_in_catalog: true, ...entry.metadata, requested_max_mapping: chooseEffort('max', entry.metadata.supported_efforts, policy.effort_policy) });
+      const custom = isCompatibleProvider(policy, policy.preferred_provider);
+      const nonReasoning = custom && policy.openai_compatible_providers[policy.preferred_provider].models[model]?.supported_efforts?.includes('off');
+      const entry = await resolve({ model, provider: policy.preferred_provider, effort: nonReasoning ? 'off' : policy.default_effort });
+      rows.push({ available_in_catalog: !custom, ...(custom ? { declared_in_policy: true, endpoint_probed: false } : {}), ...entry.metadata,
+        requested_max_mapping: nonReasoning ? { requested: 'max', effective: null, mapping: 'unsupported_requires_explicit_off' } : chooseEffort('max', entry.metadata.supported_efforts, policy.effort_policy) });
     } catch (e) { rows.push({ requested_model: model, available_in_catalog: false, error: scrub(e) }); }
   }
   return rows;
@@ -617,6 +632,20 @@ function argsOf(argv) {
   return { command, options };
 }
 async function main() {
+  if (process.argv[2] === 'setup') {
+    const { setupMain } = await import('./setup.mjs');
+    const result = await setupMain(process.argv.slice(3));
+    console.log(typeof result === 'string' ? result : JSON.stringify(result, null, 2)); return;
+  }
+  if (process.argv[2] === 'supervise') {
+    const { supervisionMain } = await import('./supervision.mjs');
+    const result = await supervisionMain(process.argv.slice(3));
+    console.log(typeof result === 'string' ? result : JSON.stringify(result, null, 2)); return;
+  }
+  if (process.argv[2] === 'incident') {
+    const { incidentMain } = await import('./incidents.mjs');
+    return incidentMain(process.argv.slice(3));
+  }
   if (process.argv[2] === 'workflow') {
     const { workflowMain } = await import('./workflow.mjs');
     const result = await workflowMain(process.argv.slice(3));
@@ -644,7 +673,7 @@ async function main() {
   }
   if (command === 'auth') { await authenticate(); return; }
   if (command === 'help') {
-    console.log(`pi\n  doctor (local setup check; no network)\n  auth (interactive private credential setup)\n  report --out RUN_DIRECTORY [--assessment ASSESSMENT.json]\n  finalize --out RUN_DIRECTORY [--repo ROOT] [--assessment ASSESSMENT.json] [--revise] [--require-complete]\n  models [--config POLICY.json]\n  workflow help (briefs, sequences, bounded loops and host decisions)\n  check --plan PLAN.json\n  run --plan PLAN.json [--out NEW_DIRECTORY_OUTSIDE_REPO]\n  diagnose --out RUN_DIRECTORY (local stop diagnosis; reads 1.2.0+ artifacts)\n  verify --out RUN_DIRECTORY [--repo REPOSITORY]\n  reconcile --out RUN_DIRECTORY\n  ledger --out RUN_DIRECTORY_OR_PARENT_OF_RUNS (sum several phases; local)\n  stats [--repo ROOT] [--out RUNS] [--period 7d|30d|90d|all] [--format json|markdown] [--tui]\n  recommend --repo ROOT [--out RUNS] --plan PLAN.json [--period 7d|30d|90d|all] [--format json|markdown]\n  learn help (local project learning; no paid calls)\n\nrun is paid inference. check/models/stats/recommend only read local state or query model metadata. No command integrates code.`);
+    console.log(`pi\n  setup help (guided provider/model preferences; local)\n  doctor (local setup check; no network)\n  auth (interactive private credential setup)\n  report --out RUN_DIRECTORY [--assessment ASSESSMENT.json]\n  finalize --out RUN_DIRECTORY [--repo ROOT] [--assessment ASSESSMENT.json] [--revise] [--require-complete]\n  models [--config POLICY.json]\n  workflow help (briefs, sequences, bounded loops and host decisions)\n  supervise help (native supervisor receipts and bounded execution)\n  incident --out RUN_DIRECTORY (private structural incident; local)\n  assessment-schema (JSON shape schema; local)\n  validate-assessment --assessment FILE [--out RUN_DIRECTORY] (read-only)\n  check --plan PLAN.json\n  run --plan PLAN.json [--out NEW_DIRECTORY_OUTSIDE_REPO]\n  diagnose --out RUN_DIRECTORY (local stop diagnosis; reads 1.2.0+ artifacts)\n  verify --out RUN_DIRECTORY [--repo REPOSITORY]\n  reconcile --out RUN_DIRECTORY\n  ledger --out RUN_DIRECTORY_OR_PARENT_OF_RUNS (sum several phases; local)\n  stats [--repo ROOT] [--out RUNS] [--period 7d|30d|90d|all] [--format json|markdown] [--tui]\n  recommend --repo ROOT [--out RUNS] --plan PLAN.json [--period 7d|30d|90d|all] [--format json|markdown]\n  learn help (local project learning; no paid calls)\n\nrun is paid inference. check/models/stats/recommend only read local state or query model metadata. No command integrates code.`);
     return;
   }
   if (command === 'diagnose') {
@@ -674,7 +703,7 @@ async function main() {
     assert(o.plan, '--plan is required');
     const plan = validatePlan(readJson(o.plan), DEFAULTS);
     const snapshot = captureSnapshot(plan); const resolve = await makeResolver(plan.policy);
-    const models = [], summary = [], advice = [];
+    const models = [], summary = [];
     for (const a of plan.agents) {
       const m = (await resolve(a)).metadata;
       const policy = workerPolicy(plan.policy, a.limits);
@@ -683,14 +712,8 @@ async function main() {
       models.push({ agent: a.id, ...m, limits });
       const bytes = a.read_files.reduce((sum, f) => sum + (snapshot.get(f)?.bytes ?? 0), 0);
       summary.push(`${a.id}: ${m.resolved_model} · effort ${m.requested_effort} → ${m.effective_pi_effort} (${m.effort_mapping}) · ${a.read_files.length} file(s), ${Math.round(bytes / 1024)} KB · ${a.mode} · ${limits.max_turns} request(s), ${limits.max_tool_calls} tool call(s), ${limits.timeout_seconds} s (finishing reserve ${reserve.turns} request(s)/${Math.floor(reserve.seconds)} s)`);
-      if (m.effort_mapping !== 'exact') advice.push(`${a.id}: requested ${m.requested_effort} is not supported; the run will be reported as ${m.effective_pi_effort}. Do not describe it as ${m.requested_effort}.`);
-      // Observed: a strong-reasoning route can take ~2 min per turn even for tool calls, so a
-      // packet of a dozen files does not fit in the default timeout on such a route.
-      if (a.read_files.length > 8 && limits.timeout_seconds <= 600) advice.push(`${a.id}: ${a.read_files.length} files against timeout_seconds ${limits.timeout_seconds}. On a slow route each turn can take minutes; consider fewer files, a longer timeout, or splitting the work into scout and implementation phases.`);
-      if (a.mode === 'write' && limits.max_turns <= 12 && a.write_files.length > 2) advice.push(`${a.id}: ${a.write_files.length} writable paths against ${limits.max_turns} provider requests. max_turns counts every request including tool iterations and completion repairs; allocate explicitly or narrow the candidate.`);
-      if (reserve.seconds < policy.finalization_seconds) advice.push(`${a.id}: finalization_seconds ${policy.finalization_seconds} is capped to ${Math.floor(reserve.seconds)} s, a quarter of timeout_seconds ${limits.timeout_seconds}.`);
     }
-    if (!/\b(words?|findings)\b/i.test(plan.context || '')) advice.push('The context states no submission cap. Say how long the submission may be (for example under 1,200 words, at most 8 findings); a model can spend its whole output budget reasoning and submit nothing.');
+    const advice = preflightAdvice(plan, models);
     console.log(JSON.stringify({ valid: true, file_count: snapshot.size, summary, advice, models, warnings: [
       'max_turns counts every provider request, including tool iterations and completion repairs. Finalization is reserved inside these limits, not added to them.',
       'The host-command lifetime must accommodate every worker wave plus preflight and billing overhead. Heartbeats do not extend host timeouts.',
@@ -700,7 +723,7 @@ async function main() {
   if (command === 'run') {
     assert(o.plan, '--plan is required');
     const result = await executeJob(readJson(o.plan), o.out, { onProgress: event => console.error(JSON.stringify(event)) });
-    console.log(JSON.stringify({ out: result.out, report: path.join(result.out, 'report.json'), costs: result.report.costs, agents: result.report.agents.map(a => ({ id: a.id, status: a.status })) }, null, 2));
+    console.log(JSON.stringify({ out: result.out, report: path.join(result.out, 'report.json'), incident: result.report.incident ?? null, costs: result.report.costs, agents: result.report.agents.map(a => ({ id: a.id, status: a.status, candidate_changes: a.changes?.length ?? 0 })) }, null, 2));
     if (result.report.agents.some(a => a.status !== 'completed')) process.exitCode = 2;
     return;
   }
@@ -712,6 +735,16 @@ async function main() {
     console.log(JSON.stringify({ source_snapshot_still_current: changed.length === 0, changed }, null, 2));
     if (changed.length) process.exitCode = 3;
     return;
+  }
+  if (command === 'assessment-schema') {
+    console.log(JSON.stringify(assessmentSchema(), null, 2)); return;
+  }
+  if (command === 'validate-assessment') {
+    assert(o.assessment, '--assessment is required');
+    const assessment = readJson(o.assessment);
+    if (o.out) validateAssessment(assessment, enrichReportArtifacts(o.out, readJson(path.join(o.out, 'report.json'))));
+    else validateAssessmentShape(assessment);
+    console.log(JSON.stringify({ valid: true, validation: o.out ? 'run_and_artifact_bound' : 'shape_only', note: 'No inference or file writes. Shape-only validation does not verify evidence or run identity.' }, null, 2)); return;
   }
   if (command === 'report') {
     assert(o.out, '--out is required');
@@ -728,7 +761,7 @@ async function main() {
     assert(o.out, '--out is required');
     const runDir = path.resolve(o.out);
     const file = path.join(runDir, 'usage.json'); const usage = readJson(file);
-    const key = keyFor('openrouter');
+    const key = usage.requests.some(r => !isNumber(r.billed_usd) && r.provider === 'openrouter' && r.response_id) ? keyFor('openrouter') : null;
     for (const r of usage.requests) if (!isNumber(r.billed_usd) && r.provider === 'openrouter' && r.response_id) {
       await reconcileRecord(r, key);
     }
@@ -749,6 +782,7 @@ async function main() {
       if (fs.existsSync(resultFile)) { const r = readJson(resultFile); r.costs = a.costs; r.status = a.status; r.warnings = a.warnings || []; writeJson(resultFile, r); }
     }
     enrichReportArtifacts(runDir, report);
+    if (needsIncident(report)) report.incident = tryWriteIncident(runDir, { report, usage, phase: 'execution', failure_code: 'worker_incomplete' });
     writeJson(path.join(runDir, 'report.json'), report);
     const assessmentFile = path.join(runDir, 'assessment.json');
     fs.writeFileSync(path.join(runDir, 'report.md'), markdownReport(report, fs.existsSync(assessmentFile) ? readJson(assessmentFile) : null), { mode: 0o600 });
@@ -757,5 +791,9 @@ async function main() {
   throw new Error(`Unknown command: ${command}`);
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
-  main().catch(e => { console.error(scrub(e, [process.env.OPENROUTER_API_KEY, process.env.OPENAI_API_KEY, process.env.ANTHROPIC_API_KEY, process.env.GEMINI_API_KEY, process.env.GOOGLE_API_KEY])); process.exitCode = 1; });
+  main().catch(e => {
+    console.error(scrub(e, [process.env.OPENROUTER_API_KEY, process.env.OPENAI_API_KEY, process.env.ANTHROPIC_API_KEY, process.env.GEMINI_API_KEY, process.env.GOOGLE_API_KEY]));
+    if (e.incident) console.error(JSON.stringify({ supervision_directory: e.supervision_directory, incident: e.incident }));
+    process.exitCode = 1;
+  });
 }

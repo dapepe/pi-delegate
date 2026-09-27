@@ -77,15 +77,15 @@ function agentIdsOf(agentsOrPlan) {
 export function validateEvaluation(input, agentsOrPlan = null) {
   assert(input && typeof input === 'object' && !Array.isArray(input), 'evaluation must be an object');
   allowedObject(input, new Set(['schema_version', 'task_id', 'task_type', 'scope', 'complexity', 'strategy', 'strategy_version', 'focus', 'workers']), 'evaluation');
-  assert(input.schema_version === EVALUATION_SCHEMA_VERSION, `Unsupported evaluation schema_version: ${input.schema_version}`);
+  assert(input.schema_version === EVALUATION_SCHEMA_VERSION, `evaluation.schema_version: received ${JSON.stringify(input.schema_version)}; expected ${EVALUATION_SCHEMA_VERSION}`);
   slug(input.task_id, 'evaluation.task_id', 128);
   // The built-ins are suggestions for consistent host classification.  A
   // bounded custom slug remains valid so projects do not need a new release to
   // describe a genuinely different task class.
   slug(input.task_type, 'evaluation.task_type', 64);
   relPath(input.scope, 'evaluation.scope');
-  assert(['bounded', 'complex'].includes(input.complexity), 'evaluation.complexity must be bounded or complex');
-  assert(STRATEGIES.includes(input.strategy), `Unsupported evaluation.strategy: ${input.strategy}`);
+  assert(['bounded', 'complex'].includes(input.complexity), `evaluation.complexity: received ${JSON.stringify(input.complexity)}; expected one of bounded, complex`);
+  assert(STRATEGIES.includes(input.strategy), `evaluation.strategy: received ${JSON.stringify(input.strategy)}; expected one of ${STRATEGIES.join(', ')}`);
   slug(input.strategy_version, 'evaluation.strategy_version', 64);
 
   assert(Array.isArray(input.focus) && input.focus.length <= MAX_FOCUS, 'evaluation.focus must be an array of at most 8 tags');
@@ -97,30 +97,32 @@ export function validateEvaluation(input, agentsOrPlan = null) {
     assert(FOCUS_TAGS.includes(tag) || /^[a-z][a-z0-9-]{0,31}$/.test(tag), `Invalid evaluation.focus tag: ${tag}`);
   }
 
-  assert(Array.isArray(input.workers) && input.workers.length > 0 && input.workers.length <= MAX_WORKERS, 'evaluation.workers must be a bounded nonempty array');
+  assert(Array.isArray(input.workers) && input.workers.length > 0 && input.workers.length <= MAX_WORKERS, 'evaluation.workers: expected an array with 1–32 items');
   const knownAgentIds = agentIdsOf(agentsOrPlan);
   const seenAgents = new Set(), seenAssignments = new Set();
-  for (const worker of input.workers) {
-    allowedObject(worker, new Set(['agent_id', 'assignment_id', 'attempt_index', 'criteria']), 'evaluation worker');
-    slug(worker.agent_id, 'evaluation worker.agent_id', 64);
-    slug(worker.assignment_id, 'evaluation worker.assignment_id', 128);
-    assert(Number.isInteger(worker.attempt_index) && worker.attempt_index >= 1 && worker.attempt_index <= 999, 'evaluation worker.attempt_index must be an integer from 1 to 999');
-    assert(Array.isArray(worker.criteria) && worker.criteria.length > 0 && worker.criteria.length <= MAX_CRITERIA, 'Each evaluation worker needs 1–8 criteria');
-    assert(!seenAgents.has(worker.agent_id), `Duplicate evaluation worker: ${worker.agent_id}`);
+  for (const [workerIndex, worker] of input.workers.entries()) {
+    const label = `evaluation.workers[${workerIndex}]`;
+    allowedObject(worker, new Set(['agent_id', 'assignment_id', 'attempt_index', 'criteria']), label);
+    slug(worker.agent_id, `${label}.agent_id`, 64);
+    slug(worker.assignment_id, `${label}.assignment_id`, 128);
+    assert(Number.isInteger(worker.attempt_index) && worker.attempt_index >= 1 && worker.attempt_index <= 999, `${label}.attempt_index: expected an integer from 1 to 999`);
+    assert(Array.isArray(worker.criteria) && worker.criteria.length > 0 && worker.criteria.length <= MAX_CRITERIA, `${label}.criteria: expected an array with 1–8 items`);
+    assert(!seenAgents.has(worker.agent_id), `${label}.agent_id: Duplicate evaluation worker ${JSON.stringify(worker.agent_id)}`);
     seenAgents.add(worker.agent_id);
     if (knownAgentIds) {
-      assert(knownAgentIds.includes(worker.agent_id), `Evaluation references unknown agent: ${worker.agent_id}`);
+      assert(knownAgentIds.includes(worker.agent_id), `${label}.agent_id: unknown plan agent ${JSON.stringify(worker.agent_id)}; expected one of ${knownAgentIds.join(', ')}`);
     }
     const assignmentKey = `${worker.assignment_id}#${worker.attempt_index}`;
-    assert(!seenAssignments.has(assignmentKey), `Duplicate evaluation assignment attempt: ${assignmentKey}`);
+    assert(!seenAssignments.has(assignmentKey), `${label}.assignment_id: duplicate evaluation assignment attempt ${JSON.stringify(assignmentKey)}`);
     seenAssignments.add(assignmentKey);
     const criteria = new Set();
-    for (const criterion of worker.criteria) {
-      allowedObject(criterion, new Set(['id', 'requirement']), 'evaluation criterion');
-      slug(criterion.id, 'evaluation criterion.id', 48);
-      assert(!criteria.has(criterion.id), `Duplicate evaluation criterion: ${criterion.id}`);
+    for (const [criterionIndex, criterion] of worker.criteria.entries()) {
+      const criterionLabel = `${label}.criteria[${criterionIndex}]`;
+      allowedObject(criterion, new Set(['id', 'requirement']), criterionLabel);
+      slug(criterion.id, `${criterionLabel}.id`, 48);
+      assert(!criteria.has(criterion.id), `${criterionLabel}.id: duplicate evaluation criterion ${JSON.stringify(criterion.id)}`);
       criteria.add(criterion.id);
-      boundedString(criterion.requirement, 'evaluation criterion.requirement', 1200);
+      boundedString(criterion.requirement, `${criterionLabel}.requirement`, 1200);
     }
   }
   if (knownAgentIds) {
@@ -137,9 +139,9 @@ export function validateEvaluation(input, agentsOrPlan = null) {
 export function classifyTask({ task_type, scope = '.', complexity = 'bounded', strategy = 'single-review', strategy_version = 'v1', focus = [] } = {}) {
   assert(task_type, 'Host task classification must supply task_type before execution');
   boundedString(task_type, 'task_type', 64);
-  assert(['bounded', 'complex'].includes(complexity), 'complexity must be bounded or complex');
+  assert(['bounded', 'complex'].includes(complexity), `complexity: received ${JSON.stringify(complexity)}; expected one of bounded, complex`);
   relPath(scope, 'scope');
-  assert(STRATEGIES.includes(strategy), `Unsupported strategy: ${strategy}`);
+  assert(STRATEGIES.includes(strategy), `strategy: received ${JSON.stringify(strategy)}; expected one of ${STRATEGIES.join(', ')}`);
   slug(strategy_version, 'strategy_version', 64);
   assert(Array.isArray(focus), 'focus must be an array');
   const result = { task_type, scope, complexity, strategy, strategy_version, focus };

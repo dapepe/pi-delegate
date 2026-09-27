@@ -3,6 +3,10 @@
 Sequences and loops use a separate [workflow schema](workflow-contracts.md), wrapping
 ordinary plans without changing their shape. It adds shared limits, closing criteria,
 ordered inputs and host decisions; those keys do not belong in the inference `policy`.
+Standalone native-supervisor receipts use the separate [supervision contract](supervision.md).
+Custom infrastructure routes use [OpenAI-compatible provider declarations](openai-compatible.md).
+Use [guided setup](setup.md) to save reusable policy preferences and compile them
+into a task plan with visible overrides and source provenance.
 
 ## Precedence and AGENTS.md
 
@@ -14,7 +18,8 @@ The host resolves the current user request and applicable project instructions, 
 
 | Field | Bundled value / rule |
 | --- | --- |
-| `preferred_provider` | `openrouter`; supported native alternatives: `openai`, `anthropic`, `google` |
+| `preferred_provider` | `openrouter`; native alternatives: `openai`, `anthropic`, `google`, or an explicitly declared `compatible:<name>` route |
+| `openai_compatible_providers` | `{}`; exact endpoint/model declarations, auth references, capabilities, rates and serialization controls; see the provider guide |
 | `preferred_models` | Five supplied preferred IDs; selects a pool, not a mandatory fan-out |
 | `model_aliases` | Explicit `x-ai/grok-latest` → `~x-ai/grok-latest`; no fuzzy matching |
 | `allow_model_exceptions` | `false`; a nonpreferred model **or provider** also needs the worker's written exception reason |
@@ -22,8 +27,8 @@ The host resolves the current user request and applicable project instructions, 
 | `effort_policy` | `best_supported`, or `strict` to prohibit effort mapping |
 | `max_agents` / `max_parallel` | `3` / `2` |
 | `max_turns` / `max_tool_calls` | `12` provider requests / `60` tool attempts per worker; completion repairs count, and the last tool slot is reserved for submission |
-| `timeout_seconds` | `600` total worker seconds; cooperative cancellation, not a hard process watchdog |
-| `request_timeout_seconds` | `600` per provider request, capped by the remaining worker time |
+| `timeout_seconds` | `600` total worker seconds; host-configurable integer 1–86,400 within authorization; cooperative cancellation |
+| `request_timeout_seconds` | `600` per provider request; host-configurable integer 1–86,400, also capped by remaining worker/workflow time |
 | `stream_idle_timeout_seconds` | `0` (disabled); optional SDK-event inactivity cancellation. It does not prove the model is idle |
 | `finalization_turns` / `finalization_seconds` | `2` / `120`, reserved **within**, not added to, the existing ceilings; the time reserve is capped at one quarter of `timeout_seconds`. In that window only `submit_result` is accepted, and every tool result warns from twice that window |
 | `max_completion_repairs` | `1`; integer 0–3, same-session follow-up inside the original allocation. `0` disables it |
@@ -35,6 +40,17 @@ The host resolves the current user request and applicable project instructions, 
 | `openrouter_routing` | `require_parameters: true`, `data_collection: deny`, `allow_fallbacks: false` |
 
 Budgets reserve conservative capacity before requests, including concurrent and unpriced attempts. Catalog rates, token estimates, endpoint behavior, and accounting delays can differ; a dollar guard is not a guaranteed billing cap. Separate runner invocations have separate ledgers. The host must account for all phases against the user's overall authorization.
+
+Write-mode preflight advice uses working requests after the finishing reserve,
+including single-file edit sequences. A response can include multiple tool calls;
+the tool/request ratio is advisory, not a claim that calls are unreachable.
+`check` accepts a numeric submission cap in the shared context or worker task.
+
+Use `assessment-schema` to print assessment field bounds and enums, and
+`validate-assessment --assessment FILE` for local shape checks before a run.
+Adding `--out RUN` validates host/run identity, criteria, findings and original
+artifacts without rewriting the assessment. A valid shape alone is not evidence
+that criteria passed.
 
 The context ceiling treats serialized bytes conservatively; it is not a model tokenizer. It can reject a request that would fit in the model's actual context. Narrow the packet rather than silently compacting away constraints or evidence.
 

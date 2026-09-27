@@ -8,6 +8,7 @@ import {
 } from './lib.mjs';
 import { readArtifactIdentity } from './evaluation.mjs';
 import { readLocal, writeLocal, localPath, bytesHash, jsonText } from './project-files.mjs';
+import { tryWriteIncident } from './incidents.mjs';
 
 const defaults = JSON.parse(fs.readFileSync(new URL('../defaults.json', import.meta.url), 'utf8'));
 const terminal = new Set(['goal_achieved', 'limit_reached', 'stalled', 'blocked']);
@@ -278,10 +279,17 @@ export async function runWorkflow(directory, packet = {}, dependencies = {}) {
       // a hard kill remain reserved instead; the persisted running marker prevents a replay.
       run.status = fs.existsSync(path.join(out, 'usage.json')) ? 'failed' : 'preflight_failed';
       run.error = 'Phase failed; inspect runner artifacts and host error before deciding what to do.';
+      run.incident = tryWriteIncident(fs.existsSync(out) ? out : ctx.root, { phase: run.status === 'preflight_failed' ? 'preflight' : 'execution', failure_code: run.status === 'preflight_failed' ? 'preflight_failed' : 'execution_failed' });
+      e.incident = run.incident;
       state.status = 'awaiting_host'; save(ctx); throw e;
     }
     state.status = 'awaiting_host'; save(ctx);
     return { out, workflow: workflowStatus(ctx.root, now()) };
+  }).catch(error => {
+    // Includes validation/admission failures before a phase directory exists. Preserve
+    // the original exception even if the private diagnostic destination is unavailable.
+    error.incident ||= tryWriteIncident(directory, { phase: 'preflight', failure_code: 'preflight_failed' });
+    throw error;
   });
 }
 

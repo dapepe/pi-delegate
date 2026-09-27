@@ -9,6 +9,7 @@
   ],
   "model_aliases": { "x-ai/grok-latest": "~x-ai/grok-latest" },
   "allow_model_exceptions": false,
+  "openai_compatible_providers": {},
   "default_effort": "xhigh",
   "complex_effort": "max",
   "effort_policy": "best_supported",

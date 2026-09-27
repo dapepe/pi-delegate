@@ -1,5 +1,30 @@
 # Changelog
 
+## 1.7.0 — 2026-09-27
+
+- Add conversation-guided setup and local `setup show/check/save/plan` commands
+  for reusable provider/model/effort/budget profiles. Saves are private and
+  conflict-checked; task overrides are explicit and no inference is performed.
+
+- Require an actual native execution/review supervisor in skill invocations;
+  standalone receipts bind its host-attested ID to the approved plan, snapshot
+  and reviewed artifacts. The primary host retains final authority.
+- Automatically retain private structural JSON/Markdown incidents for incomplete
+  runs, supervised preflight errors and workflow failures, with local recovery
+  for interrupted checkpoints. No uploads or learning opt-in required.
+- Add explicit OpenAI-compatible Chat Completions routes for local or hosted
+  infrastructure, including approved non-reasoning models, isolated credential
+  references and transparent declared cost/capability metadata. No new dependencies.
+- Separate compatible routing evidence by configuration fingerprint while keeping
+  existing built-in profile bytes and identities. See
+  [migration notes](docs/openai-compatible.md#learning-identity-and-migration).
+- Fix fractional request milliseconds rejected by the pinned SDK; advise on
+  single-file edit sequences and finishing reserves; improve assessment errors
+  and add read-only schema/assessment validation commands.
+- Keep provider outages distinct from quality evidence and require authorization
+  for named-model substitution. Synthetic tests do not establish live deployment
+  compatibility or quality.
+
 ## 1.6.1 — 2026-09-22
 
 - Use native filesystem paths for workflow CLI fixtures on Windows. The 1.6.0 feature
