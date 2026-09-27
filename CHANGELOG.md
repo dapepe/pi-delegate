@@ -24,6 +24,8 @@
 - Keep provider outages distinct from quality evidence and require authorization
   for named-model substitution. Synthetic tests do not establish live deployment
   compatibility or quality.
+- Use protected Windows ACLs for private incidents and portable file URLs for
+  the assessment CLI test preload; release CI exposed both portability issues.
 
 ## 1.6.1 — 2026-09-22
 

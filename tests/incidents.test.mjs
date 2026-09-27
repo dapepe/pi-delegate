@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { spawnSync, execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { sha256 } from '../scripts/lib.mjs';
 import { incidentSnapshot, needsIncident, tryWriteIncident, writeIncident } from '../scripts/incidents.mjs';
@@ -30,6 +30,11 @@ function save(root, r = report(), u = usage()) {
   fs.writeFileSync(path.join(root, 'report.json'), JSON.stringify(r), { mode: 0o600 });
   fs.writeFileSync(path.join(root, 'usage.json'), JSON.stringify(u), { mode: 0o600 });
 }
+function makePublic(file, mode) {
+  if (process.platform !== 'win32') { fs.chmodSync(file, mode); return; }
+  const command = `$ErrorActionPreference='Stop'; $acl=Get-Acl -LiteralPath $env:PI_SYNTHETIC_ACL_TARGET; $sid=New-Object System.Security.Principal.SecurityIdentifier('S-1-1-0'); $rule=New-Object System.Security.AccessControl.FileSystemAccessRule($sid,'Read','Allow'); $acl.AddAccessRule($rule); Set-Acl -LiteralPath $env:PI_SYNTHETIC_ACL_TARGET -AclObject $acl`;
+  execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', command], { stdio: 'pipe', env: { ...process.env, PI_SYNTHETIC_ACL_TARGET: file } });
+}
 
 test('incident files are private, idempotent, structural and preserve truthful cost categories', t => {
   const root = fixture(t); save(root);
@@ -37,9 +42,11 @@ test('incident files are private, idempotent, structural and preserve truthful c
   const first = writeIncident(root), repeated = writeIncident(root);
   assert.equal(first.status, 'written'); assert.equal(repeated.status, 'existing');
   assert.equal(first.fingerprint, repeated.fingerprint);
-  assert.equal(fs.statSync(path.join(root, 'incidents')).mode & 0o777, 0o700);
-  assert.equal(fs.statSync(first.json).mode & 0o777, 0o600);
-  assert.equal(fs.statSync(first.markdown).mode & 0o777, 0o600);
+  if (process.platform !== 'win32') {
+    assert.equal(fs.statSync(path.join(root, 'incidents')).mode & 0o777, 0o700);
+    assert.equal(fs.statSync(first.json).mode & 0o777, 0o600);
+    assert.equal(fs.statSync(first.markdown).mode & 0o777, 0o600);
+  }
   const { snapshot } = JSON.parse(fs.readFileSync(first.json));
   assert.equal(snapshot.workers[0].worker_id_sha256, sha256('synthetic-worker'));
   assert.equal(snapshot.workers[0].candidates[0].after_sha256, sha256('after'));
@@ -114,7 +121,7 @@ test('curated JSON is preserved but never silently reused as generated allowlist
   assert.notEqual(first.json, second.json);
   assert.match(fs.readFileSync(first.json, 'utf8'), /SECRET_CANARY/);
   assert.doesNotMatch(fs.readFileSync(second.json, 'utf8'), /SECRET_CANARY/);
-  fs.chmodSync(second.json, 0o644);
+  makePublic(second.json, 0o644);
   assert.equal(tryWriteIncident(root).status, 'unavailable');
 });
 
@@ -137,11 +144,11 @@ test('output symlinks/hardlinks are refused and source links are not read', t =>
 
 test('non-private existing incident directories and partial publication fail safely', t => {
   const root = fixture(t); save(root);
-  fs.mkdirSync(path.join(root, 'incidents'), { mode: 0o755 }); fs.chmodSync(path.join(root, 'incidents'), 0o755);
+  fs.mkdirSync(path.join(root, 'incidents'), { mode: 0o755 }); makePublic(path.join(root, 'incidents'), 0o755);
   const before = fs.readFileSync(path.join(root, 'report.json'), 'utf8');
   assert.equal(tryWriteIncident(root).status, 'unavailable');
   assert.equal(fs.readFileSync(path.join(root, 'report.json'), 'utf8'), before);
-  fs.chmodSync(path.join(root, 'incidents'), 0o700);
+  fs.rmdirSync(path.join(root, 'incidents'));
   const first = writeIncident(root); fs.unlinkSync(first.markdown);
   const next = writeIncident(root); assert.notEqual(first.json, next.json);
   assert.equal(fs.existsSync(first.json), true);

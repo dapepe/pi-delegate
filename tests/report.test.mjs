@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { validateAssessment, validateAssessmentShape, assessmentSchema, markdownReport } from '../scripts/report.mjs';
 import { costSummary } from '../scripts/lib.mjs';
@@ -88,7 +88,7 @@ test('assessment CLI emits a schema and validates shape or run without inference
     fs.writeFileSync(assessmentFile, JSON.stringify(assessment()));
     fs.writeFileSync(path.join(base, 'report.json'), JSON.stringify(report()));
     const before = new Map(fs.readdirSync(base).map(name => [name, fs.readFileSync(path.join(base, name), 'utf8')]));
-    const run = args => spawnSync(process.execPath, ['--import', guard, cli, ...args], { cwd: base, encoding: 'utf8' });
+    const run = args => spawnSync(process.execPath, ['--import', pathToFileURL(guard).href, cli, ...args], { cwd: base, encoding: 'utf8' });
     const schema = run(['assessment-schema']);
     assert.equal(schema.status, 0, schema.stderr);
     assert.equal(JSON.parse(schema.stdout).title, 'Pi host assessment (shape only)');

@@ -3,6 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { execFileSync } from 'node:child_process';
 import { sha256 } from './lib.mjs';
 import { localPath, readLocal, writeLocal, jsonText } from './project-files.mjs';
 import { STOP_STATUSES, RUNTIME_LIMIT_KEYS } from './runtime.mjs';
@@ -193,20 +194,53 @@ function directoryRoot(directory) {
   return fs.realpathSync(absolute);
 }
 
+// POSIX mode bits do not describe Windows access. As in credential setup, apply
+// a protected current-user ACL only to a directory this call just created.
+// Existing directories/files are checked without changing their permissions.
+function windowsPrivate(paths, createDirectory = null) {
+  const command = `$ErrorActionPreference='Stop'; $sid=[System.Security.Principal.WindowsIdentity]::GetCurrent().User;
+if ($env:PI_INCIDENT_NEW_DIRECTORY) {
+  $acl=New-Object System.Security.AccessControl.DirectorySecurity;
+  $acl.SetOwner($sid); $acl.SetAccessRuleProtection($true,$false);
+  $rule=New-Object System.Security.AccessControl.FileSystemAccessRule($sid,'FullControl','ContainerInherit,ObjectInherit','None','Allow');
+  $acl.AddAccessRule($rule); Set-Acl -LiteralPath $env:PI_INCIDENT_NEW_DIRECTORY -AclObject $acl;
+}
+foreach ($p in (ConvertFrom-Json -InputObject $env:PI_INCIDENT_PERMISSION_PATHS)) {
+  $acl=Get-Acl -LiteralPath $p; $full=$false;
+  foreach ($rule in $acl.GetAccessRules($true,$true,[System.Security.Principal.SecurityIdentifier])) {
+    if ($rule.AccessControlType -eq 'Allow') {
+      if ($rule.IdentityReference.Value -ne $sid.Value) { throw 'incident_acl_not_private' }
+      if (($rule.FileSystemRights -band [System.Security.AccessControl.FileSystemRights]::FullControl) -eq [System.Security.AccessControl.FileSystemRights]::FullControl) { $full=$true }
+    }
+  }
+  if (-not $full) { throw 'incident_acl_not_private' }
+}`;
+  try {
+    execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', command], {
+      stdio: 'pipe', timeout: 15000,
+      env: { ...process.env, PI_INCIDENT_NEW_DIRECTORY: createDirectory || '', PI_INCIDENT_PERMISSION_PATHS: JSON.stringify(paths) }
+    });
+  } catch { throw new Error('incident_windows_permissions_invalid'); }
+}
+
 /** Append an immutable snapshot. Existing curated files are never overwritten. */
 export function writeIncident(directory, envelope = {}) {
   const root = directoryRoot(directory);
   const snapshot = incidentSnapshot(root, envelope), fingerprint = sha256(JSON.stringify(snapshot));
   const incident = { schema_version: 1, fingerprint, recorded_at: new Date().toISOString(), snapshot };
   const destination = localPath(root, 'incidents');
-  try { fs.mkdirSync(destination, { mode: 0o700 }); } catch (error) { if (error.code !== 'EEXIST') throw error; }
+  let created = false;
+  try { fs.mkdirSync(destination, { mode: 0o700 }); created = true; } catch (error) { if (error.code !== 'EEXIST') throw error; }
   const stat = fs.lstatSync(localPath(root, 'incidents'));
-  if (!stat.isDirectory() || (stat.mode & 0o077) !== 0) throw new Error('incident_directory_not_private');
+  if (!stat.isDirectory() || (process.platform !== 'win32' && (stat.mode & 0o077) !== 0)) throw new Error('incident_directory_not_private');
+  if (process.platform === 'win32') windowsPrivate([destination], created ? destination : null);
   for (let revision = 0; revision < 1000; revision++) {
     const base = `incidents/${fingerprint}${revision ? `.${revision}` : ''}`, json = `${base}.json`, md = `${base}.md`;
     const priorJson = readLocal(root, json), priorMarkdown = readLocal(root, md);
-    for (const file of [json, md]) {
-      if ((file === json ? priorJson : priorMarkdown) !== null && (fs.statSync(localPath(root, file)).mode & 0o077) !== 0) throw new Error('incident_file_not_private');
+    const existing = [json, md].filter(file => (file === json ? priorJson : priorMarkdown) !== null).map(file => localPath(root, file));
+    if (process.platform === 'win32' && existing.length) windowsPrivate(existing);
+    else for (const file of existing) {
+      if ((fs.statSync(file).mode & 0o077) !== 0) throw new Error('incident_file_not_private');
     }
     if (priorJson !== null || priorMarkdown !== null) {
       let prior; try { prior = JSON.parse(priorJson); } catch { continue; }

@@ -1,6 +1,6 @@
 # Private delegation incidents
 
-Incomplete, skipped, failed, and interrupted delegations need an operational record even when project learning is off. The runner and host supervisor save structural incident snapshots in `RUN/incidents/`. A preflight failure before a run exists uses the private supervision directory selected for that attempt. No incident operation writes project learning state, changes permissions or budgets, launches inference, retries a worker, or integrates a candidate.
+Incomplete, skipped, failed, and interrupted delegations need an operational record even when project learning is off. The runner and host supervisor save structural incident snapshots in `RUN/incidents/`. A preflight failure before a run exists uses the private supervision directory selected for that attempt. No incident operation writes project learning state, changes existing directory permissions or budgets, launches inference, retries a worker, or integrates a candidate.
 
 The dedicated host supervisor should inspect its actual task/process handle and the saved run before deciding what happened. If the runner was interrupted before its final incident hook, recover a snapshot locally:
 
@@ -16,7 +16,7 @@ Incident artifacts deliberately omit objectives, prompts, file paths, source tex
 
 Operational failures, limits, refusals, missing submissions, partial claims and skipped workers remain separate categories. These are diagnostic observations. They are neither model-quality rankings nor proof that a task succeeded or failed for a particular cause. The host still validates results and owns integration decisions.
 
-New incident directories are mode `0700`; JSON and Markdown files are mode `0600`. The writer rejects symlink/hardlinked artifacts, refuses an existing non-private incident directory, and uses exclusive file publication. It never follows linked report/usage files; those inputs are marked unavailable. Existing curated reports are retained. Repeating the same snapshot reuses an unchanged pair; changed snapshots and curated pairs produce additional files. Keep curation in a separate local note when practical.
+On POSIX systems, new incident directories are mode `0700`; JSON and Markdown files are mode `0600`. On Windows, the writer uses built-in PowerShell to apply a protected current-user-only ACL to a newly created incident directory before writing any incident content; files inherit that ACL. It validates existing directory/file ACLs without changing them and fails closed if private access cannot be established. The writer rejects symlink/hardlinked artifacts, refuses an existing non-private incident directory, and uses exclusive file publication. It never follows linked report/usage files; those inputs are marked unavailable. Existing curated reports are retained. Repeating the same snapshot reuses an unchanged pair; changed snapshots and curated pairs produce additional files. Keep curation in a separate local note when practical.
 
 The writer bounds artifact reads and saved collections. Missing, malformed, oversized or unsafe inputs produce uncertainty rather than fabricated details. If incident publication itself fails, callers receive a fixed `incident_write_failed` code and preserve the original run outcome. No raw error is copied into the incident response.
 
