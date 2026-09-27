@@ -4,7 +4,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { spawnSync, execFileSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
+import { runWindowsPowerShell } from '../scripts/windows-powershell.mjs';
 import { fileURLToPath } from 'node:url';
 import { sha256 } from '../scripts/lib.mjs';
 import { incidentSnapshot, needsIncident, tryWriteIncident, writeIncident } from '../scripts/incidents.mjs';
@@ -33,7 +34,7 @@ function save(root, r = report(), u = usage()) {
 function makePublic(file, mode) {
   if (process.platform !== 'win32') { fs.chmodSync(file, mode); return; }
   const command = `$ErrorActionPreference='Stop'; $acl=Get-Acl -LiteralPath $env:PI_SYNTHETIC_ACL_TARGET; $sid=New-Object System.Security.Principal.SecurityIdentifier('S-1-1-0'); $rule=New-Object System.Security.AccessControl.FileSystemAccessRule($sid,'Read','Allow'); $acl.AddAccessRule($rule); Set-Acl -LiteralPath $env:PI_SYNTHETIC_ACL_TARGET -AclObject $acl`;
-  execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', command], { stdio: 'pipe', env: { ...process.env, PI_SYNTHETIC_ACL_TARGET: file } });
+  runWindowsPowerShell(command, { PI_SYNTHETIC_ACL_TARGET: file });
 }
 
 test('incident files are private, idempotent, structural and preserve truthful cost categories', t => {

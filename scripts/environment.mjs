@@ -4,7 +4,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import readline from 'node:readline';
-import { execFileSync } from 'node:child_process';
+import { runWindowsPowerShell } from './windows-powershell.mjs';
 import { assert } from './lib.mjs';
 
 export const CREDENTIAL_FILE = path.join(os.homedir(), '.config', 'pi', 'credentials.json');
@@ -110,7 +110,7 @@ export async function authenticate() {
     if (process.platform === 'win32') {
       // Construct a NEW protected ACL, not an incremental grant that could retain other users.
       const command = `$ErrorActionPreference='Stop'; $sid=[System.Security.Principal.WindowsIdentity]::GetCurrent().User; $acl=New-Object System.Security.AccessControl.DirectorySecurity; $acl.SetOwner($sid); $acl.SetAccessRuleProtection($true,$false); $rule=New-Object System.Security.AccessControl.FileSystemAccessRule($sid,'FullControl','ContainerInherit,ObjectInherit','None','Allow'); $acl.AddAccessRule($rule); Set-Acl -LiteralPath $env:PI_CREDENTIAL_DIRECTORY -AclObject $acl`;
-      execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', command], { stdio: 'pipe', env: { ...process.env, PI_CREDENTIAL_DIRECTORY: directory } });
+      runWindowsPowerShell(command, { PI_CREDENTIAL_DIRECTORY: directory });
     }
     fs.writeFileSync(temporary, JSON.stringify(data) + '\n', { mode: 0o600, flag: 'wx' });
     fs.renameSync(temporary, CREDENTIAL_FILE);

@@ -3,7 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { execFileSync } from 'node:child_process';
+import { runWindowsPowerShell } from './windows-powershell.mjs';
 import { sha256 } from './lib.mjs';
 import { localPath, readLocal, writeLocal, jsonText } from './project-files.mjs';
 import { STOP_STATUSES, RUNTIME_LIMIT_KEYS } from './runtime.mjs';
@@ -216,9 +216,8 @@ foreach ($p in (ConvertFrom-Json -InputObject $env:PI_INCIDENT_PERMISSION_PATHS)
   if (-not $full) { throw 'incident_acl_not_private' }
 }`;
   try {
-    execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', command], {
-      stdio: 'pipe', timeout: 15000,
-      env: { ...process.env, PI_INCIDENT_NEW_DIRECTORY: createDirectory || '', PI_INCIDENT_PERMISSION_PATHS: JSON.stringify(paths) }
+    runWindowsPowerShell(command, {
+      PI_INCIDENT_NEW_DIRECTORY: createDirectory || '', PI_INCIDENT_PERMISSION_PATHS: JSON.stringify(paths)
     });
   } catch { throw new Error('incident_windows_permissions_invalid'); }
 }
