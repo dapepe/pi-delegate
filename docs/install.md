@@ -6,7 +6,7 @@ Claude plugin and does not replace the native Codex or Claude Code agent.
 ## Prerequisites
 
 Use Node.js **22.19.0 or newer** and npm in the same execution environment as the
-host. The SDK remains pinned to **Pi 0.85.1**; no separate global Pi CLI is needed.
+host. The SDK remains pinned to **Pi 1.0.0**; no separate global Pi CLI is needed.
 Inference requires authorization for the chosen route and data, plus its approved
 credential when required. OpenRouter needs an API key; an explicitly configured
 compatible route may use its own environment-variable credential or no authentication.
@@ -163,4 +163,4 @@ authority. Read [learning](learning.md) before enabling it.
 [Claude skill locations and command naming](https://code.claude.com/docs/en/skills),
 [Claude shared AGENTS.md import](https://code.claude.com/docs/en/memory#agentsmd),
 [Claude environment configuration](https://code.claude.com/docs/en/env-vars),
-[Pi SDK runtime requirement](https://raw.githubusercontent.com/earendil-works/pi/v0.85.1/packages/agent/package.json).
+[Pi SDK runtime requirement](https://raw.githubusercontent.com/earendil-works/pi/v1.0.0/packages/agent/package.json).

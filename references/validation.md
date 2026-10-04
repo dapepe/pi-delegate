@@ -1,3 +1,66 @@
+# Validation record — pi 1.8.0
+
+Implementation validated on October 3, 2026, on macOS with Node 22.23.1.
+Release preparation on October 4 repeats the local checks and records actual
+publication/installation evidence separately.
+
+- Approved `npm install --ignore-scripts --no-audit --no-fund` generated a genuine
+  lockfile for Agent Core/Pi AI/Pi Durable 1.0.0 and Chord 1.0.0. The resolved tree
+  contains 116 dependency packages; no global CLI or system setting was changed.
+- `npm test`: 256 passed, zero failures. New coverage includes read-worker repair,
+  missing/corrupt diagnosis, private Durable contracts, ledger merging, preserved
+  known charges/usage and SDK-version learning separation. Durable reports remain
+  excluded from ordinary learning profiles.
+- `npm run check:sdk` passed against the 1.0.0 pins and Durable exports.
+- `npm run test:sdk`: 30 passed, zero failures, using installed SDKs, synthetic SSE
+  and actual subprocess `SIGKILL`. No account or live provider transport was used.
+  Crashes before dispatch and after read/submission receipt commits retain budgets,
+  counters and original elapsed deadlines. Tests also cover source/model drift,
+  live-owner rejection, missing ledgers, refreshed observation timestamps, late
+  reconciliation above a budget ceiling, diagnostic-only billing/usage publication,
+  duplicate receipt prevention and bounded submission-only completion repair.
+- Independent native forward-tests found unavailable-report diagnosis, timestamp
+  comparison and ledger synchronization/evidence gaps. Each was reproduced with
+  synthetic artifacts and corrected with regressions; no private cache material
+  or paid inference was delegated to the reviewer.
+- Skill quick validation and `git diff --check` passed. The inspected release
+  allowlist contains 104 files and excludes private/runtime paths; `npm run package`
+  produced `dist/pi.zip`. POSIX-only Durable tests are explicitly skipped on
+  Windows; no cross-platform passing result is claimed.
+
+`npm audit` was blocked by automatic approval review because it would disclose
+public dependency names/versions to npm's advisory service. It was not run; the
+user's explicit metadata-disclosure approval has not been received. No vulnerability result
+is claimed.
+
+At the October 3 implementation check, no personal installed-skill update, live
+provider test, published CI, host UI validation, Windows/Linux Durable runtime
+or power-failure recovery was tested. The backend
+is experimental and limited to one read-only worker on POSIX. These local tests
+establish guarded recovery behavior, not a measured improvement in live submission
+rates or model quality. Existing run excerpts were never converted into transcripts.
+
+## Release preparation — October 4, 2026
+
+- The first offline clean-install attempt found an uncached pinned package and
+  stopped. A subsequent networked `npm ci --ignore-scripts --no-audit --no-fund`
+  succeeded with the tracked lockfile; lifecycle scripts and npm advisory calls
+  remained disabled.
+- `npm test`: 256 passed. `npm run check:sdk` passed. `npm run test:sdk`: 30 passed
+  with synthetic transport and process-crash fixtures; no live provider calls.
+- Fresh synthetic Codex-only, Claude-only and both-host installations copied all
+  104 release files. The custom `CLAUDE_CONFIG_DIR` installation also passed.
+  Existing personal copies matched the published 1.7.0 files before replacement;
+  defaults remain unchanged.
+- CI installation commands now explicitly disable npm advisory requests so the
+  unapproved external audit is not triggered indirectly. No audit result is claimed.
+- The release package is frozen before publication and personal installation.
+  Actual GitHub run/release results and the two installed copies' validation are
+  checked afterward; repository checks do not establish host UI discovery or live
+  provider behavior.
+
+---
+
 # Validation record — pi 1.7.0
 
 Executed locally on September 27, 2026, on macOS with Node 22.23.1:

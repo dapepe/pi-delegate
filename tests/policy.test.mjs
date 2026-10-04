@@ -194,7 +194,7 @@ class FakeAgent {
     const write = tools.find(t => t.name === 'write_file');
     if (write) await write.execute('w', { path: 'src/a.js', content: 'export const value = 2;\n' });
     await tools.find(t => t.name === 'submit_result').execute('s', submission());
-    assert.equal(o.shouldStopAfterTurn(), true);
+    assert.deepEqual(o.finishTurn(), { action: 'end' });
   }
 }
 test('offline runner integration preserves source, writes candidate artifacts and bills each request once', async () => {

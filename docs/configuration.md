@@ -133,7 +133,7 @@ Moving aliases can change their target; prefer versioned identities for repeatab
 
 An alias is billed under the dated build of its target: `~x-ai/grok-latest` resolves to the catalog target `x-ai/grok-4.6`, and the generation is billed as that target's canonical slug, for example `x-ai/grok-4.6-20260810`. The resolver looks the target up in the same live catalog and records its canonical slug in `catalog_alias_target.canonical_slug`; the authorized identity set is exactly the resolved id, its canonical slug, the alias target and the target's canonical slug. Nothing is matched by prefix.
 
-Sources: [OpenRouter catalog](https://openrouter.ai/api/v1/models), [Pi OpenRouter serialization](https://raw.githubusercontent.com/earendil-works/pi/v0.85.1/packages/ai/src/api/openai-completions.ts).
+Sources: [OpenRouter catalog](https://openrouter.ai/api/v1/models), [Pi OpenRouter serialization](https://raw.githubusercontent.com/earendil-works/pi/v1.0.0/packages/ai/src/api/openai-completions.ts).
 
 ## Gateway versus upstream provider
 

@@ -25,7 +25,7 @@ function sse(id,delta,finish='stop') {
 function toolDelta(name,args,id='call-1'){return {tool_calls:[{index:0,id,type:'function',function:{name,arguments:JSON.stringify(args)}}]};}
 test('installed SDK version and exact reasoning-map contract',()=>{
   assert.ok(nodeSupported(),'Node >=22.19.0 required');
-  for(const name of ['@earendil-works/pi-agent-core','@earendil-works/pi-ai'])assert.equal(installedPackage(name).version,'0.85.1');
+  for(const name of ['@earendil-works/pi-agent-core','@earendil-works/pi-ai'])assert.equal(installedPackage(name).version,'1.0.0');
   assert.ok(getSupportedThinkingLevels(model).includes('max'));assert.ok(!getSupportedThinkingLevels(model).includes('xhigh'));
 });
 test('real OpenRouter adapter serializes max effort and maps reasoning usage once', {timeout:10000}, async()=>{

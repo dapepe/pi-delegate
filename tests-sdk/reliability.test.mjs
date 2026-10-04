@@ -37,11 +37,11 @@ test('pinned SDK rejects a fractional timeout before mocked transport', { timeou
   assert.equal(fetched, false);
 });
 
-async function runSynthetic(t, responses, { policy = {}, elapsedAfterFirstResponse = 0 } = {}) {
+async function runSynthetic(t, responses, { policy = {}, mode = 'write', elapsedAfterFirstResponse = 0 } = {}) {
   const base = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-sdk-reliability-')), repo = path.join(base, 'repo');
   fs.mkdirSync(repo); fs.writeFileSync(path.join(repo, 'a.js'), 'export const n = 1;\n');
   t.after(() => fs.rmSync(base, { recursive: true, force: true }));
-  const input = { repo_root: repo, objective: 'Synthetic reliability regression', read_files: ['a.js'], policy, agents: [{ id: 'worker', role: 'candidate implementer', task: 'Inspect and stage n=2; submit at most 8 findings.', model: model.id, mode: 'write', write_files: ['a.js'], selection_reason: 'Synthetic SDK contract fixture.' }] };
+  const input = { repo_root: repo, objective: 'Synthetic reliability regression', read_files: ['a.js'], policy, agents: [{ id: 'worker', role: 'sparring-partner', task: mode === 'read' ? 'Review n; submit at most 8 findings.' : 'Inspect and stage n=2; submit at most 8 findings.', model: model.id, mode, write_files: mode === 'read' ? [] : ['a.js'], selection_reason: 'Synthetic SDK contract fixture.' }] };
   let time = 100000, calls = 0;
   const payloads = [], timeouts = [], provider = openrouterProvider();
   const result = await executeJob(input, path.join(base, 'run'), {
@@ -60,6 +60,38 @@ async function runSynthetic(t, responses, { policy = {}, elapsedAfterFirstRespon
   });
   return { ...result, payloads, timeouts, calls, repo };
 }
+
+test('read-only normal-stop repair offers only submission and preserves the original allowance', { timeout: 20000 }, async t => {
+  const r = await runSynthetic(t, [
+    { delta: tool('read_file', { path: 'a.js' }) },
+    { delta: { content: 'Review evidence collected, but no structured submission.' }, finish: 'stop' },
+    { delta: tool('submit_result', submission) }
+  ], { mode: 'read' });
+  const worker = r.report.agents[0];
+  assert.equal(worker.status, 'completed');
+  assert.equal(worker.limit_usage.completion_repairs, 1);
+  assert.equal(worker.limits.max_turns, defaults.max_turns);
+  assert.equal(worker.limits.timeout_seconds, defaults.timeout_seconds);
+  assert.equal(worker.limits.session_budget_usd, defaults.session_budget_usd);
+  assert.equal(worker.recovery_events[0].mode, 'finalization_only');
+  assert.equal(worker.recovery_events[0].trigger, 'missing_submission');
+  assert.deepEqual(r.payloads[2].tools.map(tool => tool.function.name), ['submit_result']);
+  assert.match(JSON.stringify(r.payloads[2].messages), /FINALIZATION ONLY/);
+  assert.equal(r.report.costs.request_count, 3);
+  assert.equal(worker.changes.length, 0);
+});
+
+test('read-only repair cannot keep asking when the model ignores submission', { timeout: 20000 }, async t => {
+  const r = await runSynthetic(t, [
+    { delta: { content: 'I will investigate later.' }, finish: 'stop' },
+    { delta: { content: 'Still no submission.' }, finish: 'stop' }
+  ], { mode: 'read' });
+  assert.equal(r.report.agents[0].status, 'missing_submission');
+  assert.equal(r.report.agents[0].submission, null);
+  assert.equal(r.calls, 2);
+  assert.deepEqual(r.payloads[1].tools.map(tool => tool.function.name), ['submit_result']);
+  assert.equal(r.report.agents[0].limit_usage.completion_repairs, 1);
+});
 
 test('runner floors fractional remaining milliseconds before the real SDK transport', { timeout: 20000 }, async t => {
   const r = await runSynthetic(t, [

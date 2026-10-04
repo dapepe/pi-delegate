@@ -134,6 +134,23 @@ contract, artifact checks or host-decision records. For workflows, record the
 actual native supervisor ID and its advisory review alongside the phase's private
 artifacts; the host tool history is the evidence of real spawning and waiting.
 
+## Optional Durable read-only sessions
+
+For one standalone read-only worker, the primary host may select the experimental
+Durable backend after explicit private transcript/possible reasoning retention
+approval. Keep the same native supervisor boundaries above; use `durable init`,
+`durable run`, `durable inspect` and `durable review` with the exact contract in
+[long-running work](long-running.md). The Durable review has one bounded summary
+and the current supervisor ID/fingerprint; it does not use the ordinary review's
+`workers` array. Do not mix the two command protocols for a session.
+
+After a hard kill, the supervisor returns evidence to the primary host. It cannot
+authorize its own recovery. The primary host establishes process death, reviews
+the original deadline/ledger, spawns a new actual native supervisor and binds that
+ID to an inspected artifact fingerprint in the recovery approval. Only then may
+the new supervisor invoke `durable resume`. It retains the live process handle
+and returns an advisory review; no unattended continuation or recursive delegation.
+
 ## Compatibility and migration
 
 Existing raw plans/runs remain readable and `run --plan` remains available for

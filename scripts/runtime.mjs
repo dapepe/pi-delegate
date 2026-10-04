@@ -1,7 +1,44 @@
 /** Dependency-free stop diagnostics and deadline arithmetic. No inference, source writes, or hidden-reasoning storage. */
 import fs from 'node:fs';
 import path from 'node:path';
-import { workerPolicy, classifyStop, isNumber } from './lib.mjs';
+import { assert, workerPolicy, classifyStop, isNumber } from './lib.mjs';
+
+/** Retain forward admissions and known billing from pre-sync diagnostic ledgers. */
+export function mergeDurableLedger(checkpoint, diagnostic) {
+  assert(Array.isArray(checkpoint) && Array.isArray(diagnostic), 'Missing Durable request ledger');
+  const primary = structuredClone(checkpoint), identities = ['id', 'agent_id', 'provider', 'requested_model', 'resolved_model', 'started_at', 'reserved_usd'];
+  const billing = ['billed_usd', 'billing_source', 'upstream_provider', 'billed_model', 'is_byok', 'upstream_inference_cost_usd', 'reconciled_at'];
+  for (let index = 0; index < Math.max(primary.length, diagnostic.length); index++) {
+    const stored = primary[index], newer = diagnostic[index];
+    if (!newer) continue;
+    if (!stored) { primary.push(structuredClone(newer)); continue; }
+    assert(identities.every(key => stored[key] === newer[key]), 'Conflicting Durable request identities; return to host');
+    assert(!stored.response_id || !newer.response_id || stored.response_id === newer.response_id, 'Conflicting Durable response identities; return to host');
+    if (!stored.response_id && newer.response_id) { stored.response_id = newer.response_id; stored.response_model = newer.response_model; }
+    assert(!stored.response_model || !newer.response_model || stored.response_model === newer.response_model, 'Conflicting Durable response models; return to host');
+    if (!stored.response_model && newer.response_model) stored.response_model = newer.response_model;
+    if (isNumber(stored.billed_usd) && isNumber(newer.billed_usd)) assert(stored.billed_usd === newer.billed_usd, 'Conflicting known Durable charges; return to host');
+    if (!isNumber(stored.billed_usd) && isNumber(newer.billed_usd)) {
+      for (const key of billing) if (Object.hasOwn(newer, key)) stored[key] = newer[key];
+      delete stored.reconciliation_error;
+    }
+    const validUsage = value => value && typeof value === 'object' && !Array.isArray(value) &&
+      ['input', 'output', 'cacheRead', 'cacheWrite', 'totalTokens'].every(key => isNumber(value[key])) &&
+      ['reasoning', 'cacheWrite1h'].every(key => value[key] === undefined || isNumber(value[key])) &&
+      value.cost && ['input', 'output', 'cacheRead', 'cacheWrite', 'total'].every(key => isNumber(value.cost[key]));
+    if (validUsage(newer.usage) && newer.usage.totalTokens > 0) {
+      if (!validUsage(stored.usage) || stored.usage.totalTokens === 0) stored.usage = structuredClone(newer.usage);
+      if (isNumber(stored.estimate_usd) && isNumber(newer.estimate_usd)) assert(stored.estimate_usd === newer.estimate_usd, 'Conflicting Durable cost estimates; return to host');
+      if (!isNumber(stored.estimate_usd) && isNumber(newer.estimate_usd)) stored.estimate_usd = newer.estimate_usd;
+      if (['in_flight', 'interrupted'].includes(stored.status) && newer.status !== 'in_flight') stored.status = newer.status;
+      if (!stored.finished_at && Number.isFinite(Date.parse(newer.finished_at))) stored.finished_at = newer.finished_at;
+      if (!isNumber(stored.seconds) && isNumber(newer.seconds)) stored.seconds = newer.seconds;
+      if (stored.provider_thinking_level == null && typeof newer.provider_thinking_level === 'string') stored.provider_thinking_level = newer.provider_thinking_level;
+    }
+  }
+  assert(primary.every(request => request && typeof request.id === 'string') && new Set(primary.map(request => request.id)).size === primary.length, 'Invalid or duplicate Durable requests');
+  return primary;
+}
 
 export const RUNTIME_LIMIT_KEYS = [
   'max_turns', 'max_tool_calls', 'timeout_seconds', 'request_timeout_seconds',
@@ -84,22 +121,34 @@ export function explainStop(status) {
 export function diagnoseRun(directory) {
   // This runs on artifacts of runs that already went wrong, so every optional part is read
   // defensively: a missing or malformed section is reported as unknown, never as a crash.
-  const load = (name, fallback) => {
-    try { return JSON.parse(fs.readFileSync(path.join(directory, name), 'utf8')); }
-    catch (e) { if (fallback === undefined) throw e; return fallback; }
+  const artifactStates = {};
+  const load = name => {
+    try {
+      const value = JSON.parse(fs.readFileSync(path.join(directory, name), 'utf8'));
+      if (!value || typeof value !== 'object' || Array.isArray(value)) {
+        artifactStates[name] = 'invalid'; return {};
+      }
+      artifactStates[name] = 'read'; return value;
+    } catch (e) {
+      artifactStates[name] = e.code === 'ENOENT' ? 'missing' : e instanceof SyntaxError ? 'invalid' : 'unreadable';
+      return {};
+    }
   };
   const report = load('report.json');
-  const plan = load('plan.json', {});
-  const usage = load('usage.json', { requests: [] });
-  const requests = Array.isArray(usage.requests) ? usage.requests : [];
+  const plan = load('plan.json');
+  const usage = load('usage.json');
+  const objects = value => Array.isArray(value) ? value.filter(v => v && typeof v === 'object' && !Array.isArray(v)) : [];
+  const requests = objects(usage.requests);
   return {
-    run_id: report.run_id, skill_version: report.skill_version || 'unknown', finished: Boolean(report.finished_at),
-    last_updated_at: report.updated_at || report.finished_at || report.created_at,
+    run_id: report.run_id ?? null, skill_version: report.skill_version || 'unknown',
+    finished: artifactStates['report.json'] === 'read' ? Boolean(report.finished_at) : null,
+    artifact_states: artifactStates,
+    last_updated_at: report.updated_at || report.finished_at || report.created_at || null,
     cancellation_signal: report.cancellation_signal || null,
     orchestration_errors: report.orchestration_errors || [],
     note: 'Local artifact diagnosis, not proof of the cause of an external kill. No network or paid inference. Older 1.2.0/1.3.0 artifacts are supported; fields those runners never captured stay unknown.',
-    workers: (report.agents || []).map(a => {
-      const spec = (plan.agents || []).find(s => s.id === a.id);
+    workers: objects(report.agents).map(a => {
+      const spec = objects(plan.agents).find(s => s.id === a.id);
       const records = requests.filter(r => r.agent_id === a.id);
       // A per-worker allocation from a partial artifact must not make diagnosis itself fail.
       let limits = a.limits;

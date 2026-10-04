@@ -15,6 +15,10 @@ request: the host shows its Mermaid/ASCII diagram, coordinates each phase, and v
 the closing condition within one shared budget and deadline. See
 [workflow contracts and examples](docs/workflow-contracts.md).
 
+For larger tasks, interruption recovery and the proposed integration with upstream
+Pi 1.0/Pi Durable, see [long-running work](docs/long-running.md). Pi SDK 1.0.0 is pinned; an optional experimental Durable backend supports
+host-approved crash recovery for one read-only worker.
+
 The repository root is the complete skill. Its name and install directory are **pi** on both hosts. This is an independent MIT-licensed project, not an official OpenAI, Anthropic, Pi or OpenRouter product.
 
 ## Why I built this
@@ -25,7 +29,7 @@ I am curious to learn how others use different models and skills — happy to di
 
 ## Install
 
-Requires **Node.js 22.19.0+**, npm, a local host with native sub-agent and script tools, and an approved provider route (a key unless explicitly configured as no-auth). Pi SDK is pinned to **0.85.1**; a separate global Pi CLI is not needed. [Pinned SDK requirement](https://raw.githubusercontent.com/earendil-works/pi/v0.85.1/packages/agent/package.json).
+Requires **Node.js 22.19.0+**, npm, a local host with native sub-agent and script tools, and an approved provider route (a key unless explicitly configured as no-auth). Pi SDK is pinned to **1.0.0**; a separate global Pi CLI is not needed. [Pinned SDK requirement](https://raw.githubusercontent.com/earendil-works/pi/v1.0.0/packages/agent/package.json).
 
 Extract the ZIP or clone the repository, then run from its root:
 

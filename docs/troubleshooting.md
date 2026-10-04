@@ -1,6 +1,6 @@
 # Early stops, partial results, and safe continuation
 
-This guide applies to `pi` 1.5.0. The diagnosis command also reads 1.2.0–1.4.0 artifacts. Do not delete a failed run or launch the same plan again merely because the host stopped displaying output.
+This guide applies to the current skill runner, pinned to Pi SDK 1.0.0. The diagnosis command also reads earlier 1.2.0–1.4.0 artifacts. Do not delete a failed run or launch the same plan again merely because the host stopped displaying output. For larger assignments and optional Durable recovery, see [long-running work](long-running.md).
 
 ## Identify the layer before changing limits
 
@@ -13,6 +13,13 @@ node scripts/pi.mjs diagnose --out /absolute/path/to/the/run
 This is local inspection: no model, API key, SDK import, paid inference, or file modification. It reads `report.json`, `plan.json`, and, when present, `usage.json`. Use the output directory printed by the original `run` command, or inspect `~/.cache/pi/`. Older directories are accepted; fields the old runner never captured stay unknown, and the stop classification is derived from what they do carry.
 
 `finished: false` does **not** prove a crash. Check the existing Codex terminal-session handle or Claude task/command result. The process might still be working. A SIGKILL, host restart, or power loss cannot be diagnosed conclusively from a `running` checkpoint alone. Capture the host's exit code, signal, timestamps and stderr alongside the artifacts. Prefer sanitized excerpts over sharing source-bearing run folders.
+
+Diagnosis reports `artifact_states` for the report, plan and ledger as `read`,
+`missing`, `invalid` or `unreadable`. If the report is unavailable, `finished` is
+`null` and `workers` is empty because no report was observed; this does not mean
+zero workers ran or no money was spent. This additive diagnostic output requires
+no run or learning-state migration. Saved worker `result.json` files and incident
+capture may still supply evidence; diagnose does not reconstruct a report from them.
 
 | Status | What it means | Appropriate response |
 | --- | --- | --- |
@@ -53,7 +60,7 @@ The runtime controls are:
 
 In finalization mode only `submit_result` is offered, and the capability layer rejects investigative and edit tools even when the model calls one absent from the offered list. A partial or blocked result must list `remaining_work`; a complete result cannot. A worker's completeness claim is still subject to host validation.
 
-A premature normal stop can receive one follow-up in the **same in-memory Pi session**, retaining approved tools when allowance remains. A `length` stop receives one **submission-only** follow-up; truncated edits are never replayed. Every repair uses the same request counter, worker deadline, effort, model, access grants and cost ledger. Set `max_completion_repairs: 0` to disable it. No automatic provider retry, model fallback or quota reset occurs; the SDK's internal `maxRetries` remains zero.
+A premature normal stop can receive one follow-up in the **same in-memory Pi session**. For read-only workers it offers only `submit_result`, using existing evidence and declaring partial/blocked when investigation is unfinished. Candidate implementers retain approved tools when allowance remains. A `length` stop receives a **submission-only** follow-up in either mode; truncated edits are never replayed. Every repair uses the same request counter, worker deadline, effort, model, access grants and cost ledger. Set `max_completion_repairs: 0` to disable it. No automatic provider retry, model fallback or quota reset occurs; the SDK's internal `maxRetries` remains zero. Even a submission-only repair cannot compel a valid submission.
 
 ## Allocate by role rather than remove all limits
 
@@ -104,7 +111,7 @@ When project learning is initialized, the durable `.pi/learning/runs.json` inven
 
 This release has **in-process continuation**, not a persistent transcript resume command and not a detached daemon. After the process dies, the host must review the checkpoint and deliberately construct a new bounded task packet. Preserve the original learning task ID and account for the cost of all attempts. Do not call a fresh run a resumed session or claim it preserves provider reasoning or signatures.
 
-Cancellation is cooperative via the Pi SDK. An adapter that ignores abort, or an event-loop-blocking dependency, cannot be forcibly isolated inside this process. True per-worker process supervision with graceful-stop/kill escalation and durable compatible transcripts is a separate future hardening step, not implemented here.
+Cancellation is cooperative via the Pi SDK. An adapter that ignores abort, or an event-loop-blocking dependency, cannot be forcibly isolated inside this process. Graceful-stop/kill escalation is a separate future hardening step. Optional Durable transcript recovery is limited to one read-only worker with explicit host approval; see [long-running work](long-running.md).
 
 ## Learning separates resource failure from quality
 
@@ -116,8 +123,8 @@ Schema-2 assessments separate `quality_0_to_3` (the original assignment against 
 
 ## Sources checked 2026-09-15
 
-- [Pi 0.85.1 Agent loop](https://raw.githubusercontent.com/earendil-works/pi/v0.85.1/packages/agent/src/agent-loop.ts): natural stopping, tool termination, and rejected truncated tool calls.
-- [Pi 0.85.1 Agent lifecycle](https://raw.githubusercontent.com/earendil-works/pi/v0.85.1/packages/agent/src/agent.ts): prompt versus continuation and cooperative abort.
+- [Pi 1.0.0 Agent loop](https://raw.githubusercontent.com/earendil-works/pi/v1.0.0/packages/agent/src/agent-loop.ts): natural stopping, tool termination, and rejected truncated tool calls.
+- [Pi 1.0.0 Agent lifecycle](https://raw.githubusercontent.com/earendil-works/pi/v1.0.0/packages/agent/src/agent.ts): prompt versus continuation and cooperative abort.
 - [nicobailon tool reference](https://raw.githubusercontent.com/nicobailon/pi-subagents/main/docs/tool-reference.md): pre-deadline checkpoint requests, soft/hard budgets, separate tool/run limits and retained resume.
 - [nicobailon observability](https://raw.githubusercontent.com/nicobailon/pi-subagents/main/docs/observability.md): lifecycle artifacts and bounded inspection.
 - [tintinweb README](https://raw.githubusercontent.com/tintinweb/pi-subagents/master/README.md): graceful turn-limit handling with five grace turns, and batch-notification windows distinct from killing workers.

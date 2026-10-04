@@ -97,6 +97,19 @@ test('different runtime allocations cannot be pooled as the same model strategy'
   for(let i=1;i<=2;i++){const r=f.make(i);r.plan.policy.max_turns=i===1?12:32;r.plan.policy.timeout_seconds=i===1?600:1800;r.save();r.record();}
   const profiles=summary(f).profiles;assert.equal(profiles.length,2);assert.equal(profiles[0].distinct_tasks,1);assert.equal(profiles[1].distinct_tasks,1);
 }));
+test('Pi 1.0 SDK evidence stays separate from historical SDK profiles without rewriting them',()=>withFixture(f=>{
+  const old=f.make(1);old.record();
+  const current=f.make(2);current.report.sdk_version_target='1.0.0';current.save();current.record();
+  const profiles=summary(f).profiles;
+  assert.equal(profiles.length,2);
+  assert.deepEqual(profiles.map(p=>p.profile.sdk_version).sort(),['0.85.1','1.0.0']);
+  assert.ok(profiles.every(p=>p.distinct_tasks===1));
+}));
+test('experimental Durable reports cannot enter ordinary live learning profiles',()=>withFixture(f=>{
+  const current=f.make(1);current.report.mode='pi_durable';current.save();
+  assert.throws(()=>current.record(),/cannot become live project-learning evidence/);
+  assert.equal(summary(f).profiles.length,0);
+}));
 test('promoted guidance shows the recorded allocation without granting a larger one',()=>withFixture(f=>{
   for(let i=1;i<=3;i++){const r=f.make(i);r.plan.policy.max_turns=32;r.plan.policy.timeout_seconds=1800;r.save();r.record();}
   const proposal=proposeLearning(f.repo,{now:NOW});assert.match(proposal.block,/32 requests/);assert.match(proposal.block,/1800 worker seconds/);assert.match(proposal.block,/not permission to increase/);

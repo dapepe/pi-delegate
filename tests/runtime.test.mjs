@@ -183,7 +183,7 @@ test('ordinary exact-replacement mistakes are tool errors, not permission violat
   assert.equal(caps.state.policy_violations.length, 1);
 });
 
-test('a premature normal stop receives one bounded continuation without losing task permissions', async t => {
+test('a candidate worker premature normal stop receives bounded continuation without losing task permissions', async t => {
   const f = fixture(t);
   const { report } = await f.run(async a => {
     await a.request();
@@ -194,6 +194,32 @@ test('a premature normal stop receives one bounded continuation without losing t
   assert.equal(report.agents[0].status, 'completed'); assert.equal(report.costs.request_count, 2);
   assert.equal(report.agents[0].recovery_events[0].mode, 'bounded_continuation');
   assert.equal(report.agents[0].limit_usage.completion_repairs, 1);
+});
+
+test('read-only completion repair rejects investigation even through an unadvertised tool', async t => {
+  const f = fixture(t, {}, { mode: 'read', write_files: [] });
+  const { report } = await f.run(async a => {
+    await a.request();
+    if (a.prompts === 1) { await a.finish(); return; }
+    assert.deepEqual(a.sentContext.tools.map(x => x.name), ['submit_result']);
+    await assert.rejects(a.tool('read_file', { path: 'a.js' }), /Finalization only/);
+    await a.finish(); await a.tool('submit_result', answer('partial'));
+  });
+  const worker = report.agents[0];
+  assert.equal(worker.status, 'partial');
+  assert.equal(worker.recovery_events[0].mode, 'finalization_only');
+  assert.equal(worker.limit_usage.completion_repairs, 1);
+  assert.equal(worker.policy_violations.length, 0);
+  assert.equal(report.costs.request_count, 2);
+});
+
+test('disabling repair also prevents read-only finalization follow-ups', async t => {
+  const f = fixture(t, { max_completion_repairs: 0 }, { mode: 'read', write_files: [] });
+  const { report } = await f.run(async a => { await a.request(); await a.finish(); });
+  assert.equal(report.agents[0].status, 'missing_submission');
+  assert.equal(report.agents[0].finalization, null);
+  assert.equal(report.agents[0].recovery_events.length, 0);
+  assert.equal(report.costs.request_count, 1);
 });
 
 test('repeated premature stops cannot create an unbounded recovery loop', async t => {
@@ -478,5 +504,38 @@ test('diagnosis of a truncated or malformed run reports unknowns instead of cras
   assert.deepEqual(diagnosis.workers[0].requests, []);
   // A report with no agents at all is still a readable diagnosis.
   fs.writeFileSync(path.join(f.out, 'report.json'), JSON.stringify({ run_id: 'empty' }));
+  assert.deepEqual(diagnoseRun(f.out).workers, []);
+});
+
+test('missing or corrupt report diagnosis preserves artifact uncertainty without keys or inference', t => {
+  const f = fixture(t); fs.mkdirSync(f.out);
+  const reportPath = path.join(f.out, 'report.json');
+  for (const content of [undefined, '{"unfinished":', 'null', '[]']) {
+    if (content !== undefined) fs.writeFileSync(reportPath, content);
+    const diagnosis = diagnoseRun(f.out);
+    assert.equal(diagnosis.finished, null);
+    assert.equal(diagnosis.run_id, null);
+    assert.equal(diagnosis.last_updated_at, null);
+    assert.deepEqual(diagnosis.workers, []);
+    assert.deepEqual(diagnosis.artifact_states, {
+      'report.json': content === undefined ? 'missing' : 'invalid', 'plan.json': 'missing', 'usage.json': 'missing'
+    });
+    const result = spawnSync(process.execPath, [path.join(root, 'scripts/pi.mjs'), 'diagnose', '--out', f.out], { encoding: 'utf8' });
+    assert.equal(result.status, 0, result.stderr);
+    assert.deepEqual(JSON.parse(result.stdout), diagnosis);
+  }
+});
+
+test('malformed diagnosis collections and corrupt optional ledgers stay inspectable', t => {
+  const f = fixture(t); fs.mkdirSync(f.out);
+  fs.writeFileSync(path.join(f.out, 'report.json'), JSON.stringify({ agents: [null, { id: 'worker', status: 'running' }] }));
+  fs.writeFileSync(path.join(f.out, 'plan.json'), JSON.stringify({ agents: 'unfinished' }));
+  fs.writeFileSync(path.join(f.out, 'usage.json'), '{');
+  const diagnosis = diagnoseRun(f.out);
+  assert.equal(diagnosis.finished, false);
+  assert.equal(diagnosis.artifact_states['usage.json'], 'invalid');
+  assert.equal(diagnosis.workers[0].status, 'running');
+  assert.deepEqual(diagnosis.workers[0].requests, []);
+  fs.writeFileSync(path.join(f.out, 'report.json'), JSON.stringify({ agents: 'unfinished' }));
   assert.deepEqual(diagnoseRun(f.out).workers, []);
 });

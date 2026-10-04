@@ -21,7 +21,7 @@ Finalization and completion repair cannot grant additional permissions, switch m
 
 Candidate files and metadata are checkpointed with atomic per-file replacements; a set of files is not a transaction. A crash can leave mismatched generations or lose the latest event. Review candidate hashes and source staleness before integration. A bounded public assistant-text excerpt is retained for diagnosis, but structured thinking blocks, signatures and raw tool arguments are not persisted. Public text and candidates can still contain selected source: keep run directories private and inspect them before sharing.
 
-Worker, request and optional SDK-event idle timers use cooperative SDK abort. They do not forcibly kill a blocked dependency or provide worker-process isolation. Heartbeats indicate event-loop liveness, not provider progress, and they do not extend outer host timeouts. No detached supervisor or durable transcript resume is implemented. See [troubleshooting](troubleshooting.md).
+Worker, request and optional SDK-event idle timers use cooperative SDK abort. They do not forcibly kill a blocked dependency or provide worker-process isolation. Heartbeats indicate event-loop liveness, not provider progress, and they do not extend outer host timeouts. There is no detached supervisor. Optional Durable recovery is limited to one read-only worker on POSIX with explicit transcript retention and primary-host recovery approval; its private transcripts are excluded from incidents, releases and learning. See [the Durable contract](long-running.md). See [troubleshooting](troubleshooting.md).
 
 ## What this does not guarantee
 

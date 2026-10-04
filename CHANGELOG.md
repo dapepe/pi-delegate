@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.8.0 — 2026-10-04
+
+- Make read-only normal-stop completion repairs submission-only within existing
+  limits; candidate implementers retain bounded continuation. Add synthetic
+  runtime and real-SDK transport regressions for the repair boundary.
+- Clarify successful submission, exact excerpt citations and quality assessment;
+  a concise packet helps but does not guarantee completion.
+- Keep local diagnosis usable with missing/corrupt reports and ledgers, exposing
+  artifact availability and unknown completion instead of throwing.
+- Upgrade Agent Core/Pi AI to 1.0.0 and migrate `finishTurn` plus transcript-aware
+  finalization; preserve exact models, effort, routing, guards and synthetic transport.
+- Add opt-in experimental Pi Durable 1.0.0 with Chord 1.0.0, private fsynced JSONL,
+  one read-only worker, native ownership receipts and explicit primary-host crash
+  recovery. Preserve counters, the original deadline and unknown charge reservations;
+  replay committed tool/submission receipts without duplicate execution.
+- Add local Durable initialization/inspection/review, private transcript retention
+  approval, model/snapshot drift checks and bounded synthetic subprocess crash tests.
+  Automatic compaction/retries, candidate writes, workflows and learning promotion
+  are excluded from this first backend. See migration notes in `docs/long-running.md`.
+- Document larger live assignments and interruption recovery. Installed skills and
+  system settings are unchanged; no paid inference was performed.
+
 ## 1.7.0 — 2026-09-27
 
 - Add conversation-guided setup and local `setup show/check/save/plan` commands

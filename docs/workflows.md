@@ -63,7 +63,7 @@ One narrowed retry per failure kind, changing exactly one thing, is the limit. K
 
 Use [local diagnosis](troubleshooting.md) after any incomplete run, including old 1.2.0 and 1.3.0 artifacts. Review the last candidate checkpoint, source staleness, `remaining_work`, the admission arithmetic and the host process result. A model that ended without a structured result already received a bounded same-session repair; a truncated response already received a submission-only attempt. Neither started a new budget or extended a deadline.
 
-After a killed process there is no persistent resume command. The host may construct a new authorized packet from verified checkpoint facts, preserving the real task ID and accounting for earlier cost. Do not replay a partial edit blindly, and do not promote a resource-limited attempt into a model-quality verdict. For long implementations, authorize a fitting allocation and outer command lifetime, or split the work into smaller phases.
+Ordinary candidate/workflow runs have no transcript resume after a killed process. The optional [Durable backend](long-running.md) is limited to one standalone read-only worker. The host may construct a new authorized packet from verified checkpoint facts, preserving the real task ID and accounting for earlier cost. Do not replay a partial edit blindly, and do not promote a resource-limited attempt into a model-quality verdict. For long implementations, authorize a fitting allocation and outer command lifetime, or split the work into smaller phases.
 
 ## Spending and stopping
 

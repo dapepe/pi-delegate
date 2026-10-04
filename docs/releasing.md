@@ -11,14 +11,14 @@ The following sentence records an earlier package-preparation environment; it is
 On a trusted networked machine with the required Node version:
 
 ```sh
-npm ci --ignore-scripts
+npm ci --ignore-scripts --no-audit --no-fund
 npm run check:sdk
 npm test
 npm run test:sdk
-npm audit
+npm audit # only with explicit authorization to send dependency metadata to npm
 ```
 
-Inspect the resolved dependency graph and audit output rather than running automatic breaking upgrades. Commit the **genuinely generated `package-lock.json`**. Direct dependency pins alone do not freeze the full graph. Later clean installs should use `npm ci --ignore-scripts`. When changing Pi versions, update the version checks/overrides and validate the adapter contract explicitly; do not hide failures by weakening assertions.
+Inspect the resolved dependency graph and any authorized audit output rather than running automatic breaking upgrades. If an external audit is not authorized, record that limitation; do not trigger npm advisory checks indirectly through install/CI. Commit the **genuinely generated `package-lock.json`**. Direct dependency pins alone do not freeze the full graph. Later clean installs should use `npm ci --ignore-scripts`. When changing Pi versions, update the version checks/overrides and validate the adapter contract explicitly; do not hide failures by weakening assertions.
 
 The installed-SDK tests use synthetic HTTP responses. For endpoint confidence, separately perform an approved smoke test using a restricted key and the public fixture:
 
@@ -66,8 +66,8 @@ This creates `dist/pi.zip` and `dist/SHA256SUMS`. Given identical input bytes, t
 After a reviewed release commit:
 
 ```sh
-git tag v1.7.0
-git push origin v1.7.0
+git tag v1.8.0
+git push origin v1.8.0
 ```
 
 Choose a new tag rather than replacing an already published one. GitHub's automatic source download and the curated `pi.zip` are separate artifacts; the latter always has the installation root `pi/`.

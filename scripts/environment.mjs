@@ -119,10 +119,10 @@ export async function authenticate() {
 }
 export function doctor(skillDir) {
   const checks = [{ name: 'Node >=22.19.0', ok: nodeSupported(), actual: process.versions.node }];
-  for (const name of ['@earendil-works/pi-agent-core', '@earendil-works/pi-ai', 'diff']) {
+  for (const name of ['@earendil-works/pi-agent-core', '@earendil-works/pi-ai', '@earendil-works/pi-durable', 'diff']) {
     try {
       const pkg = installedPackage(name);
-      const expected = name === 'diff' ? '8.0.4' : '0.85.1';
+      const expected = name === 'diff' ? '8.0.4' : '1.0.0';
       checks.push({ name, ok: pkg.version === expected, actual: pkg.version, expected });
     } catch { checks.push({ name, ok: false, remedy: 'Run npm install in the installed skill folder, or npm ci when a lockfile is present' }); }
   }

@@ -79,7 +79,7 @@ Request `xhigh` for bounded work and `max` for broad, consequential or subtle wo
 
 Each worker needs explicit `mode: read` or `mode: write`, exact `read_files` and, for write mode, exact `write_files`. No directories, globs, symlinks, credentials, binaries, whole-repository dumps or agent configuration. `AGENTS.md`, overrides, `CLAUDE.md`, local Claude instructions and `.pi` learning state are not delegable. Summarize relevant authorized instructions yourself into the task packet. Existing write targets must also be readable by that worker; explicitly authorized new paths may be absent.
 
-Packet a **reviewer** tightly: an explicit submission cap (for example under 1,200 words, at most eight findings), and an instruction to read each file once and then submit. This is an output bound, not a finding quota; never reward invented findings to fill it. A model can spend its entire output budget on reasoning and submit nothing; a cap is what stops that. Keep the packet to a handful of files on a slow route, where some strong-reasoning routes take about two minutes per turn even for a tool call.
+Packet a **reviewer** tightly: an explicit submission cap (for example under 1,200 words, at most eight findings), and an instruction to read each file once and then submit. This is an output bound, not a finding quota; never reward invented findings to fill it. Reasoning can consume the output allowance before submission; a concise packet helps but cannot guarantee a result. Keep the packet to a handful of files on a slow route, where some strong-reasoning routes take minutes per turn even for a tool call. Require a successfully validated `submit_result`, not a prose promise. For excerpts, cite the exact granted packet path and its physical line; mention original-source numbering in evidence. If submission validation fails, correct that issue within the existing allowance.
 
 Packet an **implementer** differently — a cap on findings is not a cap on an edit, and the defaults are sized for a bounded review:
 
@@ -126,11 +126,30 @@ Then send that directory to the already running supervisor. It runs `supervise r
 
 Keep execution supervised by the current host. Do not detach it or promise later work. Before starting, check the **outer host-command lifetime**, which is separate from Pi's worker and request deadlines: allow for every worker wave plus preflight and billing overhead within authorized host settings. A yielded tool response with a live session handle is not a dead worker — keep that handle and use the host's supported wait mechanism instead of starting a duplicate paid run. Do not silently edit host timeouts or disable safeguards. Progress and heartbeats are JSON lines on stderr; final stdout identifies the run directory. Inspect artifacts after nonzero exits too: errors and rejected results may still incur cost.
 
+For larger assignments or requests to survive interruption, read
+[long-running work and optional Durable recovery](docs/long-running.md).
+Pi SDK 1.0.0 is pinned. Ordinary supervision remains the default. Read-only
+normal-stop repair offers only submission using existing evidence; candidate
+implementers can continue within their remaining allowance.
+
+The optional experimental `durable` backend supports one standalone read-only
+worker on POSIX. Obtain explicit private transcript/possible reasoning retention
+approval for the task, spawn an actual native supervisor, then use `durable init`
+with its returned ID and `--retain-transcript approved`. The supervisor owns
+`durable run`, monitors its process and records `durable review`. The primary host
+alone approves crash recovery, binds a new actual supervisor and inspected artifact
+fingerprint, and preserves the original ledger, counters and elapsed deadline.
+Use the guide's exact `durable inspect/resume` protocol. Never clear locks blindly,
+compact automatically or relabel a fresh packet as resume. Durable has no candidate
+writes, workflows, recursive delegation or unattended continuation. Its experimental
+reports remain outside project learning/finalization; ordinary supervision retains
+the existing learning path.
+
 Bundled ceilings are **12 provider requests (not user turns), 60 tool calls and 600 seconds per worker**, with a model-capped output allowance. Choose a bounded task that fits, or explicitly authorize a different plan allocation. An individual worker may carry smaller `limits`; it can never raise a plan ceiling. Dollar guards are **soft**, not provider-side caps. In-flight requests can overshoot and unknown costs are not zero. Standalone runs have separate ledgers; the workflow wrapper deducts all its earlier phases, retries and reservations before admitting another phase. Account for every phase against the user's overall authorization. A restricted provider key provides an additional provider-side spending boundary.
 
 `timeout_seconds` and `request_timeout_seconds` are host-configurable plan ceilings, each at most 86,400 seconds. An actual request is also capped by the remaining worker/workflow time. Raising the request ceiling alone cannot extend either outer lifetime; inspect recorded timing and obtain any authorization needed for a revised total allocation. These are technical bounds, not spending permission.
 
-`finalization_turns` (2) and `finalization_seconds` (120) reserve the finishing allowance **inside** those ceilings, along with the last tool slot. In that window only `submit_result` is accepted, and from twice that window tool results carry the remaining seconds. A worker that read everything and timed out before writing is the most expensive failure there is, so let the reserve do its job rather than raising the timeout first. The runner also permits at most one same-session completion repair: a premature normal stop may continue the original task with its approved tools, and an output-length stop may only submit existing findings — a truncated edit is never replayed. Repairs keep the same model, effort, counters, deadline and ledger; they are not fresh runs. Set `max_completion_repairs: 0` to disable them.
+`finalization_turns` (2) and `finalization_seconds` (120) reserve the finishing allowance **inside** those ceilings, along with the last tool slot. In that window only `submit_result` is accepted, and from twice that window tool results carry the remaining seconds. A worker that read everything and timed out before writing is the most expensive failure there is, so let the reserve do its job rather than raising the timeout first. The runner also permits at most one same-session completion repair: a premature normal stop offers submission-only repair for read workers or bounded continuation for candidate implementers, and an output-length stop may only submit existing findings — a truncated edit is never replayed. Repairs keep the same model, effort, counters, deadline and ledger; they are not fresh runs. Set `max_completion_repairs: 0` to disable them.
 
 Every worker's `result.json` carries a `stop_diagnostic` (which layer stopped it) plus `failure_class`, `failure_hint` and a `suggested_learning_failure_kind` for your assessment. Treat them in three groups:
 

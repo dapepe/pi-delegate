@@ -37,9 +37,9 @@ jobs:
         shell: bash
         run: |
           if [ -f package-lock.json ]; then
-            npm ci --ignore-scripts
+            npm ci --ignore-scripts --no-audit --no-fund
           else
-            npm install --ignore-scripts
+            npm install --ignore-scripts --no-audit --no-fund
           fi
       - run: npm run check:sdk
       - run: npm test

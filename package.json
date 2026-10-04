@@ -1,6 +1,6 @@
 {
   "name": "pi",
-  "version": "1.7.0",
+  "version": "1.8.0",
   "private": true,
   "type": "module",
   "description": "Codex and Claude Code skill: controlled multi-model Pi delegation and evidence-backed project learning",
@@ -18,14 +18,14 @@
     "smoke": "node scripts/smoke.mjs"
   },
   "dependencies": {
-    "@earendil-works/pi-agent-core": "0.85.1",
-    "@earendil-works/pi-ai": "0.85.1",
+    "@earendil-works/pi-agent-core": "1.0.0",
+    "@earendil-works/pi-ai": "1.0.0",
+    "@earendil-works/pi-durable": "1.0.0",
     "diff": "8.0.4"
   },
   "license": "MIT",
   "overrides": {
     "@earendil-works/pi-ai": "$@earendil-works/pi-ai",
-    "@earendil-works/chord": "0.85.1",
-    "@earendil-works/pi-telemetry": "0.85.1"
+    "@earendil-works/chord": "1.0.0"
   }
 }
