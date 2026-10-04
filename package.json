@@ -21,7 +21,7 @@
     "@earendil-works/pi-agent-core": "1.0.0",
     "@earendil-works/pi-ai": "1.0.0",
     "@earendil-works/pi-durable": "1.0.0",
-    "diff": "8.0.4"
+    "diff": "9.0.0"
   },
   "license": "MIT",
   "overrides": {
