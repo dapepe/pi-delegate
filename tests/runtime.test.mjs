@@ -11,7 +11,7 @@ import {
   validateSubmission, classifyStop, authorizedIdentities, openRouterModel, costSummary
 } from '../scripts/lib.mjs';
 import { aggregateLedger } from '../scripts/report.mjs';
-import { executeJob } from '../scripts/pi.mjs';
+import { executeJob, reconcileRun } from '../scripts/pi.mjs';
 import { shouldFinalize, finalizationReserve, publicText, diagnoseRun, explainStop, STOP_STATUSES } from '../scripts/runtime.mjs';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -82,6 +82,42 @@ function fixture(t, policy = {}, agent = {}) {
   };
   return { base, repo, out, plan, model, run, agent: () => instance };
 }
+
+test('late mismatch refreshes report, result and diagnosis without changing original evidence', async t => {
+  const f = fixture(t);
+  await f.run(async a => { await a.request(); await a.finish(); await a.tool('submit_result', answer()); }, {
+    fetchGeneration: async () => { throw new Error('Synthetic delayed billing'); }
+  });
+  const read = relative => JSON.parse(fs.readFileSync(path.join(f.out, relative), 'utf8'));
+  const original = read('worker/result.json');
+  const billing = {
+    keyFor: () => 'SYNTHETIC',
+    fetchGeneration: async () => ({ data: { total_cost: 0.01, model: 'synthetic/unauthorized-model' } })
+  };
+  await reconcileRun(f.out, billing); await reconcileRun(f.out, billing);
+  const report = read('report.json').agents[0], result = read('worker/result.json'), diagnosis = diagnoseRun(f.out).workers[0];
+  for (const worker of [report, result, diagnosis]) {
+    assert.equal(worker.status, 'model_mismatch'); assert.equal(worker.failure_class, 'model_mismatch');
+    assert.equal(worker.suggested_learning_failure_kind, 'provider');
+  }
+  for (const worker of [report, result]) assert.equal(worker.stop_diagnostic.layer, 'identity');
+  assert.deepEqual(result.submission, original.submission); assert.deepEqual(result.artifact_identity, original.artifact_identity);
+  assert.equal(report.warnings.filter(warning => warning.startsWith('Late reconciliation')).length, 1);
+  assert.equal(read('usage.json').requests.length, 1);
+});
+
+test('diagnosis derives historical stale classifications without rewriting saved artifacts', async t => {
+  const f = fixture(t);
+  await f.run(async a => { await a.request(); await a.finish(); await a.tool('submit_result', answer()); });
+  const file = path.join(f.out, 'report.json'), report = JSON.parse(fs.readFileSync(file, 'utf8'));
+  report.agents[0].status = 'model_mismatch';
+  for (const stale of ['none', 'turn_limit']) {
+    report.agents[0].failure_class = stale; fs.writeFileSync(file, JSON.stringify(report));
+    const bytes = fs.readFileSync(file), diagnosis = diagnoseRun(f.out).workers[0];
+    assert.equal(diagnosis.failure_class, 'model_mismatch'); assert.equal(diagnosis.layer, 'identity');
+    assert.deepEqual(fs.readFileSync(file), bytes);
+  }
+});
 
 test('every stop status has both a layer and a retry classification', () => {
   for (const status of STOP_STATUSES) {

@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { validateWorkflow, workflowBrief, workflowDiagram, initWorkflow, runWorkflow, decideWorkflow, workflowStatus, workflowMain, checkWorkflow } from '../scripts/workflow.mjs';
 import { openRouterModel } from '../scripts/lib.mjs';
+import { reconcileRun } from '../scripts/pi.mjs';
 import { STRATEGIES as evaluationStrategies } from '../scripts/evaluation.mjs';
 import { STRATEGIES as learningStrategies } from '../scripts/learning.mjs';
 
@@ -51,6 +52,88 @@ function fixture(t, loop = false) {
   const checks = result => workflow.criteria.map(c => ({ id: c.id, result, evidence: ['Synthetic host check'] }));
   return { base, repo, out, workflow, run, dependencies, decision, decide, checks, init: () => initWorkflow(workflow, out) };
 }
+
+const mismatch = out => reconcileRun(out, {
+  keyFor: () => 'SYNTHETIC',
+  fetchGeneration: async () => ({ data: { total_cost: 0.01, model: 'synthetic/unauthorized-model' } })
+});
+
+for (const action of ['complete', 'repeat']) test(`late mismatch in an accepted phase blocks ${action}`, async t => {
+  const f = fixture(t, action === 'repeat'); f.init();
+  const first = await f.run(); await f.decide('advance'); await f.run(); await mismatch(first.out);
+  const before = workflowStatus(f.out);
+  await assert.rejects(f.decide(action, {
+    checks: f.checks(action === 'complete' ? 'passed' : 'failed'),
+    ...(action === 'repeat' ? { progress: true, remaining_work: ['Synthetic refinement'] } : {})
+  }), /remain complete/);
+  assert.deepEqual(workflowStatus(f.out).decisions, before.decisions);
+  assert.equal(workflowStatus(f.out).status, 'awaiting_host');
+});
+
+test('earlier loop-cycle mismatch blocks final closure', async t => {
+  const f = fixture(t, true); f.init();
+  const earlier = await f.run(); await f.decide('advance'); await f.run();
+  await f.decide('repeat', { checks: f.checks('failed'), progress: true, remaining_work: ['Synthetic refinement'] });
+  await f.run(); await f.decide('advance'); await f.run(); await mismatch(earlier.out);
+  await assert.rejects(f.decide('complete', { checks: f.checks('passed') }), /remain complete/);
+});
+
+test('earlier loop-cycle mismatch blocks advance without changing host decisions', async t => {
+  const f = fixture(t, true); f.init();
+  const earlier = await f.run(); await f.decide('advance'); await f.run();
+  await f.decide('repeat', { checks: f.checks('failed'), progress: true, remaining_work: ['Synthetic refinement'] });
+  await f.run(); await mismatch(earlier.out);
+  const before = workflowStatus(f.out);
+  await assert.rejects(f.decide('advance'), /no longer complete/);
+  const after = workflowStatus(f.out);
+  assert.equal(after.revision, before.revision); assert.equal(after.step_index, before.step_index);
+  assert.deepEqual(after.decisions, before.decisions);
+});
+
+for (const artifact of ['report.json', 'worker/result.json']) test(`earlier ${artifact} status alone cannot be ignored`, async t => {
+  const f = fixture(t); f.init();
+  const first = await f.run(); await f.decide('advance'); await f.run();
+  const file = path.join(first.out, artifact), stored = json(file);
+  if (artifact === 'report.json') stored.agents[0].status = 'model_mismatch';
+  else stored.status = 'model_mismatch';
+  fs.writeFileSync(file, JSON.stringify(stored));
+  await assert.rejects(f.decide('complete', { checks: f.checks('passed') }), /remain complete/);
+});
+
+test('an empty accepted report cannot pass by omitting the authorized worker', async t => {
+  const f = fixture(t); f.init();
+  const first = await f.run(); await f.decide('advance'); await f.run();
+  const file = path.join(first.out, 'report.json'), stored = json(file);
+  stored.agents = []; fs.writeFileSync(file, JSON.stringify(stored));
+  await assert.rejects(f.decide('complete', { checks: f.checks('passed') }), /workers differ/);
+});
+
+test('authorized late billing preserves successful closure and evidence', async t => {
+  const f = fixture(t); f.init();
+  const first = await f.run(); await f.decide('advance'); await f.run();
+  const file = path.join(first.out, 'worker/result.json'), before = json(file);
+  await reconcileRun(first.out, {
+    keyFor: () => 'SYNTHETIC',
+    fetchGeneration: async () => ({ data: { total_cost: 0.01, model: before.model.resolved_model } })
+  });
+  const after = json(file);
+  assert.equal(after.failure_class, 'none'); assert.deepEqual(after.artifact_identity, before.artifact_identity);
+  assert.equal((await f.decide('complete', { checks: f.checks('passed') })).status, 'goal_achieved');
+});
+
+test('late mismatch after advance blocks the next dispatch without state or ledger changes', async t => {
+  const f = fixture(t); f.init();
+  const first = await f.run(); await f.decide('advance'); await mismatch(first.out);
+  const before = workflowStatus(f.out); let dispatched = 0;
+  const stateBytes = fs.readFileSync(path.join(f.out, 'workflow-state.json'));
+  const usageBytes = fs.readFileSync(path.join(first.out, 'usage.json'));
+  await assert.rejects(f.run(async a => { dispatched++; await a.submit(); }), /no longer complete/);
+  const after = workflowStatus(f.out);
+  assert.equal(dispatched, 0); assert.equal(after.status, before.status);
+  assert.equal(after.runs.length, before.runs.length);
+  assert.deepEqual(fs.readFileSync(path.join(f.out, 'workflow-state.json')), stateBytes);
+  assert.deepEqual(fs.readFileSync(path.join(first.out, 'usage.json')), usageBytes);
+});
 
 test('workflow validation rejects unknown fields, unbounded loops, foreign hosts/tasks and forward handoffs', t => {
   const f = fixture(t, true);

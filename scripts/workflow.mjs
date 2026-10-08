@@ -194,8 +194,19 @@ function identities(ctx, run) {
 function unchangedArtifacts(ctx, run) {
   assert(JSON.stringify(identities(ctx, run)) === JSON.stringify(run.artifacts), 'Run artifacts changed after completion or host review');
 }
+function runStillComplete(ctx, run, report = readJson(runPath(ctx, run), 'report.json')) {
+  const ids = ctx.workflow.steps.find(step => step.id === run.step).plan.agents.map(agent => agent.id).sort();
+  assert(JSON.stringify(report.agents.map(agent => agent.id).sort()) === JSON.stringify(ids), 'Reviewed phase workers differ from the workflow phase');
+  return report.agents.every(agent => {
+    const original = readLocal(runPath(ctx, run), `${slug(agent.id, 'worker id')}/result.json`);
+    if (original === null) return false;
+    const result = JSON.parse(original);
+    return agent.status === 'completed' && result.status === 'completed' && result.submission?.completion === 'complete';
+  });
+}
 function handoff(ctx, ref, iteration, nextPlan) {
   const run = acceptedRun(ctx, ref, iteration); unchangedArtifacts(ctx, run);
+  assert(runStillComplete(ctx, run), 'Candidate producer is no longer complete; host must re-evaluate');
   const root = runPath(ctx, run), previous = readJson(root, 'plan.json'), snapshot = readJson(root, 'snapshot.json');
   assert(verifySnapshot(previous.repo_root, snapshot.files, previous.policy.max_file_bytes).length === 0, 'Candidate baseline is stale; host must replan');
   const identity = readArtifactIdentity(root, ref.agent, { plan: previous, snapshot });
@@ -239,6 +250,10 @@ export async function runWorkflow(directory, packet = {}, dependencies = {}) {
   return locked(directory, async ctx => {
     const { state, workflow } = ctx, now = dependencies.now || Date.now;
     assert(state.status === 'ready', `Workflow is ${state.status}; host review is required before another run`);
+    for (const accepted of state.runs.filter(run => run.accepted)) {
+      unchangedArtifacts(ctx, accepted);
+      assert(runStillComplete(ctx, accepted), 'Reviewed phase is no longer complete; host must re-evaluate');
+    }
     const costs = accounting(ctx), startedAt = state.started_at ?? now(), deadline = startedAt + workflow.limits.timeout_seconds * 1000;
     if (costs.remaining_budget_usd <= 0 || deadline <= now()) {
       state.status = 'limit_reached'; state.reason = costs.remaining_budget_usd <= 0 ? 'workflow_budget' : 'workflow_timeout';
@@ -316,24 +331,22 @@ export async function decideWorkflow(directory, decision, now = Date.now()) {
     let report = null, complete = false;
     if (run?.status === 'finished' && decision.action !== 'stop') {
       unchangedArtifacts(ctx, run); report = readJson(runPath(ctx, run), 'report.json');
-      const ids = workflow.steps[state.step_index].plan.agents.map(a => a.id).sort();
-      assert(JSON.stringify(report.agents.map(a => a.id).sort()) === JSON.stringify(ids), 'Run report workers differ from the workflow phase');
-      complete = report.agents.every(a => {
-        const original = readLocal(runPath(ctx, run), `${slug(a.id, 'worker id')}/result.json`);
-        if (original === null) return false;
-        const result = JSON.parse(original);
-        return a.status === 'completed' && result.status === 'completed' && result.submission?.completion === 'complete';
-      });
+      complete = runStillComplete(ctx, run, report);
     }
     const last = state.step_index === workflow.steps.length - 1;
     if (decision.action === 'advance') {
       assert(complete && !last, 'Advance requires a complete nonfinal phase; partial or failed work must be reported');
+      for (const accepted of state.runs.filter(run => run.accepted)) {
+        unchangedArtifacts(ctx, accepted);
+        assert(runStillComplete(ctx, accepted), 'Reviewed phase is no longer complete; host must re-evaluate');
+      }
       run.accepted = true; state.step_index++; state.status = 'ready';
     } else if (decision.action === 'complete' || decision.action === 'repeat') {
       assert(complete && last, 'Closing a cycle requires all phases to finish successfully');
       // Revalidate all accepted producers/consumers, including earlier-cycle source provenance.
       for (const r of state.runs.filter(r => r.accepted || r.id === run.id)) {
         unchangedArtifacts(ctx, r);
+        assert(runStillComplete(ctx, r), 'Closing a cycle requires every reviewed phase to remain complete');
         const source = readJson(runPath(ctx, r), 'snapshot.json');
         assert(verifySnapshot(source.repo_root, source.files, source.max_file_bytes).length === 0, 'Reviewed snapshot changed; host must replan');
       }

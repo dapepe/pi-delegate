@@ -23,7 +23,7 @@ import { needsIncident, tryWriteIncident } from './incidents.mjs';
 const HOME = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const DEFAULTS = JSON.parse(fs.readFileSync(path.join(HOME, 'defaults.json'), 'utf8'));
 const SDK_VERSION = '1.0.0';
-const SKILL_VERSION = '1.8.0';
+const SKILL_VERSION = '1.9.0';
 const API = 'https://openrouter.ai/api/v1';
 const readJson = filename => JSON.parse(fs.readFileSync(filename, 'utf8'));
 function enrichReportArtifacts(runDir, report) {
@@ -678,12 +678,18 @@ export async function reconcileRun(directory, dependencies = {}) {
       const mismatches = records.filter(r => r.billed_model && !identities.has(r.billed_model));
       if (mismatches.length) {
         a.status = 'model_mismatch';
+        a.stop_diagnostic = explainStop(a.status);
+        Object.assign(a, classifyStop({ status: a.status }));
         a.warnings ||= [];
         const warning = 'Late reconciliation found an unauthorized billed model. The host must re-evaluate any prior integration decision.';
         if (!a.warnings.includes(warning)) a.warnings.push(warning);
       }
       const resultFile = path.join(runDir, a.id, 'result.json');
-      if (fs.existsSync(resultFile)) { const r = readJson(resultFile); r.costs = a.costs; r.status = a.status; r.warnings = a.warnings || []; writeJson(resultFile, r); }
+      if (fs.existsSync(resultFile)) {
+        const r = readJson(resultFile); r.costs = a.costs; r.status = a.status; r.warnings = a.warnings || [];
+        if (a.status === 'model_mismatch') Object.assign(r, { stop_diagnostic: a.stop_diagnostic, failure_class: a.failure_class, failure_hint: a.failure_hint, suggested_learning_failure_kind: a.suggested_learning_failure_kind });
+        writeJson(resultFile, r);
+      }
     }
     if (!durable) enrichReportArtifacts(runDir, report);
     if (needsIncident(report)) report.incident = tryWriteIncident(runDir, { report, usage, phase: 'execution', failure_code: 'worker_incomplete' });

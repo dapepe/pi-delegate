@@ -156,8 +156,9 @@ export function diagnoseRun(directory) {
         try { limits = runtimeLimits(workerPolicy(plan.policy || {}, spec?.limits), a.model?.max_output_tokens); }
         catch { limits = runtimeLimits(plan.policy || {}, a.model?.max_output_tokens); }
       }
-      // Old artifacts predate the recorded classification; derive it from what they do carry.
-      const classification = a.failure_class ? { failure_class: a.failure_class, failure_hint: a.failure_hint ?? null, suggested_learning_failure_kind: a.suggested_learning_failure_kind ?? null }
+      // Derive absent or stale classifications from the saved operational status.
+      const storedClassificationCurrent = a.failure_class && !(a.status !== 'completed' && a.failure_class === 'none') && !(a.status === 'model_mismatch' && a.failure_class !== 'model_mismatch');
+      const classification = storedClassificationCurrent ? { failure_class: a.failure_class, failure_hint: a.failure_hint ?? null, suggested_learning_failure_kind: a.suggested_learning_failure_kind ?? null }
         : classifyStop({ status: a.status, warnings: a.warnings || [], usage: records.at(-1)?.usage ?? null, max_output_tokens: limits.max_output_tokens, timing: a.timing ?? null, finalization_seconds: limits.finalization_seconds, timeout: limits.timeout_seconds });
       return {
         id: a.id, status: a.status, reason: a.reason || null, ...explainStop(a.status), ...classification,

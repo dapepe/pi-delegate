@@ -170,3 +170,23 @@ test('Durable normal-stop repair serializes submission-only tools and remains bo
   assert.deepEqual(requests[1].tools.map(tool => tool.function.name), ['submit_result']);
   assert.equal(records(directory).report.agents[0].status, 'partial');
 });
+
+test('late billing mismatch refreshes authoritative Durable diagnostics', { timeout: 15000 }, async t => {
+  const { directory } = fixture(t), deps = dependencies(directory);
+  deps.fetchGeneration = async () => { throw new Error('Synthetic billing unavailable until reconciliation'); };
+  await runDurable(directory, null, deps);
+  const before = records(directory).report.agents[0];
+  await reconcileRun(path.join(directory, 'run'), {
+    keyFor: () => 'SYNTHETIC',
+    fetchGeneration: async () => ({ data: { total_cost: 0.00003, model: 'synthetic/unauthorized-model' } })
+  });
+  const recovery = records(directory), report = json(path.join(directory, 'run/report.json')).agents[0];
+  const result = json(path.join(directory, 'run/worker/result.json'));
+  for (const worker of [recovery.report.agents[0], report, result]) {
+    assert.equal(worker.status, 'model_mismatch'); assert.equal(worker.failure_class, 'model_mismatch');
+    assert.equal(worker.stop_diagnostic.layer, 'identity'); assert.equal(worker.suggested_learning_failure_kind, 'provider');
+    assert.deepEqual(worker.submission, before.submission); assert.deepEqual(worker.artifact_identity, before.artifact_identity);
+  }
+  assert.equal(recovery.requests.length, 2);
+  assert.ok(recovery.requests.every(request => request.billed_model === 'synthetic/unauthorized-model'));
+});

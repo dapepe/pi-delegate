@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.9.0 — 2026-10-08
+
+- Revalidate exact workers, report/result status and completed submissions in all
+  accepted workflow phases before dispatch, advance, repeat or completion. Late
+  model mismatches in earlier phases or loop cycles block further progress while
+  preserving prior host decisions, artifact identities and cost evidence.
+- Refresh failure classification and stop diagnostics when late billing exposes
+  an unauthorized model, including worker results and authoritative Durable state.
+- Derive correct read-only diagnosis for historical reports whose operational
+  status changed but retained a stale successful or unrelated classification.
+- Add synthetic regressions for delayed billing, phase-status disagreement,
+  omitted workers, earlier cycles, blocked dispatch and Durable reconciliation.
+  No schema migration or dependency changes; see workflow compatibility notes.
+
 ## 1.8.0 — 2026-10-04
 
 - Make read-only normal-stop completion repairs submission-only within existing

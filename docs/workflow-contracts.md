@@ -104,6 +104,12 @@ CLI exit 2 indicates an incomplete phase. The host must inspect the actual submi
 candidate and source provenance, validate relevant claims and perform any tests itself.
 Do not equate `completion: complete` with correct work.
 
+Before dispatch, advance, repeat or completion, the wrapper rechecks accepted phases
+against their exact worker lists and both report/result status. Earlier loop cycles
+are included. Late reconciliation that marks a worker `model_mismatch` blocks further
+progress even when candidate hashes are unchanged. Inspect the affected run and
+re-evaluate its evidence; retain prior decisions, costs and artifacts when replanning.
+
 Write a decision using the **current** revision and run ID from `status`:
 
 ```json
@@ -217,7 +223,16 @@ reserved. There is no automatic process resume or stale-lock takeover.
 decisions, remaining work, all attempts and aggregate costs. Report both criterion
 outcomes and actual integration status to the user. Costs exclude the current host.
 
+Reconciliation after a workflow has already closed retains the recorded host decision;
+it does not automatically reopen the workflow or roll back integration. The run's
+mismatch warning requires the primary host to re-evaluate that decision separately.
+
 ## Migration notes
+
+Version 1.9.0 changes validation without changing workflow/state or learning schemas.
+Existing runs remain readable. `diagnose` derives stale failure classifications from
+saved operational status without rewriting artifacts; `reconcile` refreshes report,
+worker-result and Durable recovery diagnostics for an unauthorized billed model.
 
 Workflow schema 1/state schema 1 are new, opt-in artifacts outside the repository.
 Existing `run --plan`, plan/evaluation/assessment schemas, SDK defaults and learning

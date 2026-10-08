@@ -1,3 +1,42 @@
+# Validation record — pi 1.9.0
+
+Executed locally on October 8, 2026, on macOS with Node 22.23.1:
+
+- `npm test`: 267 passed, zero failures. Eleven new synthetic regressions cover
+  late model mismatches before workflow dispatch/advance/closure, earlier loop
+  cycles, report/result disagreement, omitted workers, preserved state/evidence,
+  authorized late billing and read-only diagnosis of stale classifications.
+- `npm run check:sdk` passed against the unchanged Agent Core/Pi AI/Pi Durable
+  1.0.0, Chord 1.0.0 and diff 8.0.4 pins.
+- `npm run test:sdk`: 31 passed, zero failures. The additional synthetic Durable
+  transport test checks authoritative recovery/report/result classification after
+  delayed unauthorized billing while retaining original submission evidence.
+- Skill quick validation and `git diff --check` passed. No state/learning schema,
+  dependency, installed personal skill or system setting changed.
+- An independent native reviewer found no concrete blockers and ran 85 targeted
+  synthetic workflow/runtime/Durable tests successfully without editing files.
+- The inspected release allowlist contains 104 files. Packaging and ZIP checksum,
+  entry-list and source-byte verification passed. Fresh temporary Codex-only,
+  Claude-only, both-host and custom-Claude-directory installations copied every
+  allowlisted file correctly without changing personal installations.
+- An offline clean install stopped on an uncached pinned package. A subsequent
+  networked `npm ci --ignore-scripts --no-audit --no-fund` in the extracted release
+  copy succeeded. SDK checks, 267 unit tests and 31 synthetic SDK tests passed
+  again using that freshly installed dependency tree.
+
+Two approved live read-only Pi opinions informed the fix proposal. The primary
+host checked their findings and validated an isolated candidate before integration;
+the opinions do not establish live fix behavior or comparative model rankings.
+Private reports, assessments, source excerpts and billing evidence remain outside
+the release tree. Release tests use synthetic transport and perform no paid inference.
+No external advisory audit or live host UI discovery is claimed.
+
+Actual GitHub CI/publication evidence is reported in the published release after
+observing its results. Closed workflows retain historical host decisions; later
+mismatch warnings require separate host reassessment.
+
+---
+
 # Validation record — pi 1.8.0
 
 Implementation validated on October 3, 2026, on macOS with Node 22.23.1.
